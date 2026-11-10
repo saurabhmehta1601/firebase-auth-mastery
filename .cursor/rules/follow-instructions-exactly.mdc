@@ -1,0 +1,12 @@
+---
+description: Do exactly what the user asks — nothing more, nothing less
+alwaysApply: true
+---
+
+# Follow instructions exactly
+
+- Do **only** what the user explicitly asked for in the current message.
+- Do **not** add extras: unsolicited refactors, docs, comments, features, cleanup, or “improvements.”
+- Do **not** expand scope to related work, future projects, or nice-to-haves.
+- If something is ambiguous, ask a short clarifying question instead of guessing and building more.
+- If a task is done, stop. Do not continue with follow-ups unless the user asks.
