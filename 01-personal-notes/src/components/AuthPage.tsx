@@ -22,6 +22,8 @@ function getErrorMessage(error: unknown): string {
       return 'Incorrect email or password.'
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait and try again.'
+    case 'auth/user-disabled':
+      return 'Account temporarily disabled.'
     case 'auth/popup-closed-by-user':
       return 'Sign-in was cancelled.'
     case 'auth/popup-blocked':
