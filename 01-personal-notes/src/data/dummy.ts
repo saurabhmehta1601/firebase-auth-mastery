@@ -1,24 +1,8 @@
-export type Profile = {
-  name: string
-  email: string
-  userId: string
-  bio: string
-  joinedAt: string
-}
-
 export type Note = {
   id: string
   title: string
   content: string
   updatedAt: string
-}
-
-export const dummyProfile: Profile = {
-  name: 'Alex Rivera',
-  email: 'alex.rivera@example.com',
-  userId: 'user_demo_001',
-  bio: 'Collecting thoughts, meeting notes, and half-finished ideas in one place.',
-  joinedAt: 'March 12, 2025',
 }
 
 export const dummyNotes: Note[] = [

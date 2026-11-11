@@ -4,9 +4,15 @@ type SidebarProps = {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   email: string
+  onLogout: () => void | Promise<void>
 }
 
-export function Sidebar({ activeTab, onTabChange, email }: SidebarProps) {
+export function Sidebar({
+  activeTab,
+  onTabChange,
+  email,
+  onLogout,
+}: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -37,6 +43,9 @@ export function Sidebar({ activeTab, onTabChange, email }: SidebarProps) {
         <p className="sidebar-email" title={email}>
           {email}
         </p>
+        <button type="button" className="btn btn-ghost" onClick={() => onLogout()}>
+          Log out
+        </button>
       </div>
     </aside>
   )

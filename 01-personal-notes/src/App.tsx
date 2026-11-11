@@ -1,27 +1,65 @@
 import { useState } from 'react'
+import { AuthPage } from './components/AuthPage'
 import { NotesPanel } from './components/NotesPanel'
 import { ProfilePanel } from './components/ProfilePanel'
 import { Sidebar, type Tab } from './components/Sidebar'
-import { dummyNotes, dummyProfile } from './data/dummy'
+import { VerifyEmailPage } from './components/VerifyEmailPage'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { dummyNotes } from './data/dummy'
 
-export default function App() {
+function getEmailActionParams() {
+  const params = new URLSearchParams(window.location.search)
+  return {
+    mode: params.get('mode'),
+    oobCode: params.get('oobCode'),
+  }
+}
+
+function AppShell() {
+  const { user, loading, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('notes')
+  const { mode, oobCode } = getEmailActionParams()
+
+  if (mode === 'verifyEmail' && oobCode) {
+    return <VerifyEmailPage oobCode={oobCode} />
+  }
+
+  if (loading) {
+    return (
+      <div className="page-center">
+        <p className="muted">Checking your session…</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthPage />
+  }
 
   return (
     <div className="app-shell">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        email={dummyProfile.email}
+        email={user.email ?? 'Signed in'}
+        onLogout={logout}
       />
 
       <main className="main-panel">
         {activeTab === 'notes' ? (
           <NotesPanel notes={dummyNotes} />
         ) : (
-          <ProfilePanel profile={dummyProfile} />
+          <ProfilePanel user={user} />
         )}
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   )
 }
