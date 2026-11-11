@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AuthPage } from './components/AuthPage'
 import { NotesPanel } from './components/NotesPanel'
 import { ProfilePanel } from './components/ProfilePanel'
+import { SessionLoadingPage } from './components/SessionLoadingPage'
 import { Sidebar, type Tab } from './components/Sidebar'
 import { VerifyEmailPage } from './components/VerifyEmailPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -25,11 +26,7 @@ function AppShell() {
   }
 
   if (loading) {
-    return (
-      <div className="page-center">
-        <p className="muted">Checking your session…</p>
-      </div>
-    )
+    return <SessionLoadingPage />
   }
 
   if (!user) {
