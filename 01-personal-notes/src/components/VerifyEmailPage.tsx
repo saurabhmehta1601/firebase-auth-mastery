@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Alert, Button, Card, Spinner } from '@heroui/react'
 import { applyActionCode } from 'firebase/auth'
 import { auth } from '../firebase'
 
@@ -49,79 +50,62 @@ export function VerifyEmailPage({ oobCode }: VerifyEmailPageProps) {
   }
 
   return (
-    <div className="auth-page verify-page">
-      <div className="auth-card verify-card" data-status={status}>
-        <div className="verify-brand">
-          <span className="brand-mark">N</span>
-          <p className="brand-name">Personal Notes</p>
-        </div>
+    <div className="grid min-h-svh place-items-center p-6">
+      <Card className="w-full max-w-[420px]">
+        <Card.Header className="items-center">
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-accent font-display text-lg font-semibold text-accent-foreground">
+              N
+            </span>
+            <p className="font-bold text-foreground">Personal Notes</p>
+          </div>
+        </Card.Header>
 
-        {status === 'verifying' ? (
-          <>
-            <div className="verify-icon verify-icon-pending" aria-hidden="true">
-              <span className="verify-spinner" />
-            </div>
-            <h1>Verifying your email</h1>
-            <p className="muted">
-              Hang tight — we are confirming your address.
-            </p>
-          </>
-        ) : null}
+        <Card.Content className="items-center gap-4 text-center">
+          {status === 'verifying' ? (
+            <>
+              <Spinner size="lg" color="accent" />
+              <h1 className="text-3xl">Verifying your email</h1>
+              <p className="text-sm leading-6 text-muted">
+                Hang tight — we are confirming your address.
+              </p>
+            </>
+          ) : null}
 
-        {status === 'success' ? (
-          <>
-            <div className="verify-icon verify-icon-success" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M5 13l4 4L19 7"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <h1>Email verified</h1>
-            <p className="muted">
-              Your address is confirmed. You can continue into your notes.
-            </p>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={continueToApp}
-            >
-              Continue to app
-            </button>
-          </>
-        ) : null}
+          {status === 'success' ? (
+            <Alert status="success">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Email verified</Alert.Title>
+                <Alert.Description>
+                  Your address is confirmed. You can continue into your notes.
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
 
-        {status === 'error' ? (
-          <>
-            <div className="verify-icon verify-icon-error" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M7 7l10 10M17 7L7 17"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <h1>Couldn’t verify email</h1>
-            <p className="muted">
-              {error ||
-                'This link is invalid or expired. Request a new verification email from your profile.'}
-            </p>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={continueToApp}
-            >
-              Back to app
-            </button>
-          </>
+          {status === 'error' ? (
+            <Alert status="danger">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>Couldn’t verify email</Alert.Title>
+                <Alert.Description>
+                  {error ||
+                    'This link is invalid or expired. Request a new verification email from your profile.'}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          ) : null}
+        </Card.Content>
+
+        {status !== 'verifying' ? (
+          <Card.Footer>
+            <Button fullWidth onPress={continueToApp}>
+              {status === 'success' ? 'Continue to app' : 'Back to app'}
+            </Button>
+          </Card.Footer>
         ) : null}
-      </div>
+      </Card>
     </div>
   )
 }

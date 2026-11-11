@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { User } from 'firebase/auth'
+import { Alert, Button, Card, Chip } from '@heroui/react'
 import { useAuth } from '../context/AuthContext'
 
 type ProfilePanelProps = {
@@ -37,53 +38,85 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   }
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Profile</h1>
-          <p className="muted">Your Firebase Auth user information.</p>
-        </div>
+    <div className="grid w-full max-w-3xl gap-5">
+      <header>
+        <h1 className="text-3xl sm:text-4xl">Profile</h1>
+        <p className="mt-1 text-sm text-muted">
+          Your Firebase Auth user information.
+        </p>
       </header>
 
-      {error ? <p className="form-error">{error}</p> : null}
-      {message ? <p className="form-success">{message}</p> : null}
+      {error ? (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{error}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
+      {message ? (
+        <Alert status="success">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{message}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
 
-      <section className="profile-card">
-        <dl className="profile-grid">
-          <div>
-            <dt>Email</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div>
-            <dt>User ID</dt>
-            <dd className="mono">{user.uid}</dd>
-          </div>
-          <div>
-            <dt>Email verified</dt>
-            <dd className="verified-row">
-              <span>{user.emailVerified ? 'Verified' : 'Not verified'}</span>
-              {!user.emailVerified ? (
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={handleSendVerification}
-                  disabled={sending}
+      <Card>
+        <Card.Content>
+          <dl className="grid gap-4">
+            <div>
+              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
+                Email
+              </dt>
+              <dd className="mt-1 text-foreground">{user.email}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
+                User ID
+              </dt>
+              <dd className="mt-1 font-mono text-sm break-all text-foreground">{user.uid}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
+                Email verified
+              </dt>
+              <dd className="mt-1 flex flex-wrap items-center gap-3">
+                <Chip
+                  color={user.emailVerified ? 'success' : 'warning'}
+                  size="sm"
+                  variant="soft"
                 >
-                  {sending ? 'Sending…' : 'Send Verification Email'}
-                </button>
-              ) : null}
-            </dd>
-          </div>
-          <div>
-            <dt>Account created</dt>
-            <dd>{createdAt}</dd>
-          </div>
-          <div>
-            <dt>Last sign-in</dt>
-            <dd>{lastSignIn}</dd>
-          </div>
-        </dl>
-      </section>
+                  {user.emailVerified ? 'Verified' : 'Not verified'}
+                </Chip>
+                {!user.emailVerified ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    isDisabled={sending}
+                    onPress={handleSendVerification}
+                  >
+                    {sending ? 'Sending…' : 'Send Verification Email'}
+                  </Button>
+                ) : null}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
+                Account created
+              </dt>
+              <dd className="mt-1 text-foreground">{createdAt}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
+                Last sign-in
+              </dt>
+              <dd className="mt-1 text-foreground">{lastSignIn}</dd>
+            </div>
+          </dl>
+        </Card.Content>
+      </Card>
     </div>
   )
 }
