@@ -7,19 +7,27 @@ import {
 } from 'react'
 import {
   createUserWithEmailAndPassword,
+  GithubAuthProvider,
+  GoogleAuthProvider,
   onAuthStateChanged,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   type User,
 } from 'firebase/auth'
 import { auth } from '../firebase'
+
+const googleProvider = new GoogleAuthProvider()
+const githubProvider = new GithubAuthProvider()
 
 type AuthContextValue = {
   user: User | null
   loading: boolean
   register: (email: string, password: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogle: () => Promise<void>
+  loginWithGithub: () => Promise<void>
   logout: () => Promise<void>
   sendVerificationEmail: () => Promise<void>
 }
@@ -45,6 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password)
   }
 
+  async function loginWithGoogle() {
+    await signInWithPopup(auth, googleProvider)
+  }
+
+  async function loginWithGithub() {
+    await signInWithPopup(auth, githubProvider)
+  }
+
   async function logout() {
     await signOut(auth)
   }
@@ -66,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         register,
         login,
+        loginWithGoogle,
+        loginWithGithub,
         logout,
         sendVerificationEmail,
       }}

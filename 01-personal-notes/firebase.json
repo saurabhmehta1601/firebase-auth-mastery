@@ -15,7 +15,15 @@
   },
   "auth": {
     "providers": {
-      "emailPassword": true
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Personal Notes",
+        "supportEmail": "saurabhmehta1601@gmail.com",
+        "authorizedRedirectUris": [
+          "https://master-firebase-auth-yt.firebaseapp.com/__/auth/handler",
+          "http://localhost"
+        ]
+      }
     }
   }
 }
