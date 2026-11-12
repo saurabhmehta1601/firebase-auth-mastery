@@ -111,9 +111,8 @@ describe('AuthForm', () => {
     expect(screen.getByRole('button', { name: 'Sign up with Google' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Sign up with GitHub' })).toBeDisabled()
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Already have an account? Sign in' }),
-    )
+    expect(screen.getByText('Already have an account?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(props.onModeChange).toHaveBeenCalledWith('login')
   })
 

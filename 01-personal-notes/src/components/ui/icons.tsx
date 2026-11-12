@@ -1,3 +1,97 @@
+import type { ReactNode } from 'react'
+import { cn } from './cn'
+
+type IconProps = {
+  className?: string
+}
+
+function StrokeIcon({ className, children }: IconProps & { children: ReactNode }) {
+  return (
+    <svg
+      className={cn('size-4 shrink-0', className)}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
+    </svg>
+  )
+}
+
+export function NotesIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" />
+    </StrokeIcon>
+  )
+}
+
+export function UserIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </StrokeIcon>
+  )
+}
+
+export function LogOutIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+    </StrokeIcon>
+  )
+}
+
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </StrokeIcon>
+  )
+}
+
+export function CheckCircleIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </StrokeIcon>
+  )
+}
+
+export function AlertCircleIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v4.5M12 16h.01" />
+    </StrokeIcon>
+  )
+}
+
+export function AlertTriangleIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9.5v4M12 17h.01" />
+    </StrokeIcon>
+  )
+}
+
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </StrokeIcon>
+  )
+}
+
 export function GoogleIcon() {
   return (
     <svg

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { User } from 'firebase/auth'
-import { Alert, Button, Card, CloseButton, EmptyState } from '@heroui/react'
 import type { Note } from '../data/dummy'
 import { useAuth } from '../context/AuthContext'
+import { Alert, Button, Card, NotesIcon, PageHeader } from './ui'
 
 type NotesPanelProps = {
   notes: Note[]
@@ -40,68 +40,55 @@ export function NotesPanel({ notes }: NotesPanelProps) {
   }
 
   return (
-    <div className="grid w-full max-w-3xl gap-5">
-      {showVerifyAlert ? (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              You still haven&apos;t verified your email.
-            </Alert.Description>
-            <Button
-              className="mt-2"
-              size="sm"
-              variant="tertiary"
-              isDisabled={sending}
-              onPress={handleVerifyNow}
+    <div className="grid w-full max-w-3xl animate-rise gap-8">
+      <PageHeader title="My Notes" description="Dummy notes belonging to the current user." />
+
+      {showVerifyAlert || error || message ? (
+        <div className="grid gap-3">
+          {showVerifyAlert ? (
+            <Alert
+              status="warning"
+              title="Verify your email"
+              dismissLabel="Dismiss email verification alert"
+              onDismiss={() => setDismissed(true)}
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={sending}
+                  disabled={sending}
+                  onClick={handleVerifyNow}
+                >
+                  {sending ? 'Sending…' : 'Send verification email'}
+                </Button>
+              }
             >
-              {sending ? 'Sending…' : 'Click here to verify now.'}
-            </Button>
-          </Alert.Content>
-          <CloseButton
-            aria-label="Dismiss email verification alert"
-            onPress={() => setDismissed(true)}
-          />
-        </Alert>
+              You still haven&apos;t verified your email.
+            </Alert>
+          ) : null}
+          {error ? <Alert status="danger">{error}</Alert> : null}
+          {message ? <Alert status="success">{message}</Alert> : null}
+        </div>
       ) : null}
 
-      {error ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
-      {message ? (
-        <Alert status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{message}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
-
-      <header>
-        <h1 className="text-3xl sm:text-4xl">My Notes</h1>
-        <p className="mt-1 text-sm text-muted">
-          Dummy notes belonging to the current user.
-        </p>
-      </header>
-
-      <section className="grid gap-3" aria-label="Your notes">
+      <section className="grid gap-4 sm:grid-cols-2" aria-label="Your notes">
         {notes.length === 0 ? (
-          <EmptyState>No notes yet.</EmptyState>
+          <div className="grid justify-items-center gap-3 rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center sm:col-span-2">
+            <span className="grid size-11 place-items-center rounded-full bg-accent-soft text-accent">
+              <NotesIcon className="size-5" />
+            </span>
+            <p className="text-sm font-medium text-ink-soft">No notes yet.</p>
+          </div>
         ) : (
           notes.map((note) => (
-            <Card key={note.id}>
-              <Card.Header>
-                <Card.Title>{note.title}</Card.Title>
-                <Card.Description>Updated {note.updatedAt}</Card.Description>
-              </Card.Header>
-              <Card.Content>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{note.content}</p>
-              </Card.Content>
+            <Card key={note.id} className="flex flex-col gap-3 p-6">
+              <div className="grid gap-1">
+                <h2 className="text-xl leading-snug">{note.title}</h2>
+                <p className="text-xs font-medium text-muted">Updated {note.updatedAt}</p>
+              </div>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">
+                {note.content}
+              </p>
             </Card>
           ))
         )}

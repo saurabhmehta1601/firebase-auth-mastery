@@ -1,19 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import {
-  Alert,
-  Button,
-  Card,
-  Input,
-  Label,
-  Spinner,
-  TextField,
-} from '@heroui/react'
 import { FirebaseError } from 'firebase/app'
 import {
   confirmPasswordReset,
   verifyPasswordResetCode,
 } from 'firebase/auth'
 import { auth } from '../firebase'
+import { Alert, AuthShell, Button, StatusIcon, TextField } from './ui'
 
 type Status = 'checking' | 'ready' | 'submitting' | 'success' | 'error'
 
@@ -111,164 +103,111 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
     window.location.assign('/')
   }
 
+  if (status === 'ready' || status === 'submitting') {
+    return (
+      <AuthShell>
+        <div className="grid gap-2 text-center">
+          <h1 className="text-[28px] leading-tight">Choose a new password</h1>
+          <p className="text-sm leading-6 text-ink-soft">
+            {email
+              ? `Create a new password for ${email}.`
+              : 'Create a new password for your account.'}
+          </p>
+        </div>
+
+        <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
+          {error ? (
+            <Alert status="danger">
+              <span className="whitespace-pre-line">{error}</span>
+            </Alert>
+          ) : null}
+
+          <TextField
+            label="New password"
+            required
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            minLength={6}
+            placeholder="At least 6 characters"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            disabled={status === 'submitting'}
+          />
+
+          <TextField
+            label="Confirm password"
+            required
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            minLength={6}
+            placeholder="Repeat your new password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            disabled={status === 'submitting'}
+          />
+
+          <Button
+            type="submit"
+            size="lg"
+            fullWidth
+            className="mt-1"
+            loading={status === 'submitting'}
+            disabled={status === 'submitting'}
+          >
+            {status === 'submitting' ? 'Saving…' : 'Save new password'}
+          </Button>
+        </form>
+      </AuthShell>
+    )
+  }
+
   return (
-    <div className="relative grid min-h-svh place-items-center overflow-hidden p-6">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-70"
-        style={{
-          backgroundImage:
-            'radial-gradient(ellipse 60% 40% at 50% -10%, rgb(120 160 140 / 0.28), transparent), radial-gradient(circle at 85% 80%, rgb(180 200 188 / 0.35), transparent 42%)',
-        }}
-      />
-
-      <Card className="relative w-full max-w-[420px] animate-[rise_0.45s_ease_both] shadow-[var(--shadow-card)]">
-        <Card.Header className="gap-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-accent font-display text-lg font-semibold text-accent-foreground">
-              N
-            </span>
-            <p className="font-bold text-foreground">Personal Notes</p>
-          </div>
-
-          {status === 'checking' ? (
-            <div className="grid justify-items-center gap-3 py-6 text-center">
-              <Spinner size="lg" color="accent" />
-              <h1 className="text-3xl">Checking your link</h1>
-              <p className="text-sm leading-6 text-muted">
+    <AuthShell>
+      <div className="grid justify-items-center gap-5 py-2 text-center">
+        {status === 'checking' ? (
+          <>
+            <StatusIcon tone="loading" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Checking your link</h1>
+              <p className="text-sm leading-6 text-ink-soft">
                 One moment while we confirm this reset request.
               </p>
             </div>
-          ) : null}
-
-          {status === 'success' ? (
-            <div className="grid gap-2">
-              <h1 className="text-3xl">Password updated</h1>
-              <Card.Description>
-                Your new password is ready. Sign in to get back to your notes.
-              </Card.Description>
-            </div>
-          ) : null}
-
-          {status === 'error' && !email ? (
-            <div className="grid gap-2">
-              <h1 className="text-3xl">Link unavailable</h1>
-              <Card.Description>
-                This password reset link can’t be used anymore.
-              </Card.Description>
-            </div>
-          ) : null}
-
-          {status === 'ready' || status === 'submitting' ? (
-            <div className="grid gap-2">
-              <h1 className="text-3xl">Choose a new password</h1>
-              <Card.Description>
-                {email
-                  ? `Create a new password for ${email}.`
-                  : 'Create a new password for your account.'}
-              </Card.Description>
-            </div>
-          ) : null}
-        </Card.Header>
-
-        {status === 'ready' || status === 'submitting' ? (
-          <form className="contents" onSubmit={handleSubmit}>
-            <Card.Content>
-              <div className="grid gap-4">
-                {error ? (
-                  <Alert status="danger">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Description className="whitespace-pre-line">
-                        {error}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                ) : null}
-
-                <TextField
-                  isRequired
-                  fullWidth
-                  variant="secondary"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={6}
-                  value={password}
-                  onChange={setPassword}
-                  isDisabled={status === 'submitting'}
-                >
-                  <Label>New password</Label>
-                  <Input />
-                </TextField>
-
-                <TextField
-                  isRequired
-                  fullWidth
-                  variant="secondary"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={6}
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  isDisabled={status === 'submitting'}
-                >
-                  <Label>Confirm password</Label>
-                  <Input />
-                </TextField>
-              </div>
-            </Card.Content>
-
-            <Card.Footer className="flex-col gap-2">
-              <Button
-                type="submit"
-                fullWidth
-                isDisabled={status === 'submitting'}
-              >
-                {status === 'submitting' ? 'Saving…' : 'Save new password'}
-              </Button>
-            </Card.Footer>
-          </form>
+          </>
         ) : null}
 
         {status === 'success' ? (
-          <Card.Content>
-            <Alert status="success">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>All set</Alert.Title>
-                <Alert.Description>
-                  You can sign in with your new password whenever you’re ready.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          </Card.Content>
+          <>
+            <StatusIcon tone="success" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Password updated</h1>
+              <p className="text-sm leading-6 text-ink-soft">
+                Your new password is ready. Sign in to get back to your notes.
+              </p>
+            </div>
+          </>
         ) : null}
 
-        {status === 'error' && !email ? (
-          <Card.Content>
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Couldn’t open reset link</Alert.Title>
-                <Alert.Description>
-                  {error ||
-                    'Request a fresh password reset email from the sign-in page.'}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          </Card.Content>
+        {status === 'error' ? (
+          <>
+            <StatusIcon tone="danger" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Link unavailable</h1>
+              <p className="text-sm leading-6 text-ink-soft">
+                {error || 'Request a fresh password reset email from the sign-in page.'}
+              </p>
+            </div>
+          </>
         ) : null}
 
-        {status === 'success' || (status === 'error' && !email) ? (
-          <Card.Footer>
-            <Button fullWidth onPress={continueToSignIn}>
-              {status === 'success' ? 'Continue to sign in' : 'Back to sign in'}
-            </Button>
-          </Card.Footer>
+        {status === 'success' || status === 'error' ? (
+          <Button size="lg" fullWidth className="mt-2" onClick={continueToSignIn}>
+            {status === 'success' ? 'Continue to sign in' : 'Back to sign in'}
+          </Button>
         ) : null}
-      </Card>
-    </div>
+      </div>
+    </AuthShell>
   )
 }

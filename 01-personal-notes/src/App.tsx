@@ -39,7 +39,7 @@ function AppShell() {
   }
 
   return (
-    <div className="grid min-h-svh min-[841px]:grid-cols-[248px_minmax(0,1fr)]">
+    <div className="grid min-h-svh min-[841px]:grid-cols-[260px_minmax(0,1fr)]">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -47,7 +47,7 @@ function AppShell() {
         onLogout={logout}
       />
 
-      <main className="min-w-0 px-5 py-6 sm:px-8 sm:py-8">
+      <main className="min-w-0 px-5 py-8 sm:px-10 sm:py-12 lg:px-14">
         {activeTab === 'notes' ? (
           <NotesPanel notes={dummyNotes} />
         ) : (

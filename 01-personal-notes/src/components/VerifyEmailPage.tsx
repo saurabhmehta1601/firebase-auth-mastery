@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Spinner } from '@heroui/react'
 import { applyActionCode } from 'firebase/auth'
 import { auth } from '../firebase'
+import { AuthShell, Button, StatusIcon } from './ui'
 
 type Status = 'verifying' | 'success' | 'error'
 
@@ -50,62 +50,51 @@ export function VerifyEmailPage({ oobCode }: VerifyEmailPageProps) {
   }
 
   return (
-    <div className="grid min-h-svh place-items-center p-6">
-      <Card className="w-full max-w-[420px]">
-        <Card.Header className="items-center">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-accent font-display text-lg font-semibold text-accent-foreground">
-              N
-            </span>
-            <p className="font-bold text-foreground">Personal Notes</p>
-          </div>
-        </Card.Header>
-
-        <Card.Content className="items-center gap-4 text-center">
-          {status === 'verifying' ? (
-            <>
-              <Spinner size="lg" color="accent" />
-              <h1 className="text-3xl">Verifying your email</h1>
-              <p className="text-sm leading-6 text-muted">
+    <AuthShell>
+      <div className="grid justify-items-center gap-5 py-2 text-center">
+        {status === 'verifying' ? (
+          <>
+            <StatusIcon tone="loading" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Verifying your email</h1>
+              <p className="text-sm leading-6 text-ink-soft">
                 Hang tight — we are confirming your address.
               </p>
-            </>
-          ) : null}
+            </div>
+          </>
+        ) : null}
 
-          {status === 'success' ? (
-            <Alert status="success">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Email verified</Alert.Title>
-                <Alert.Description>
-                  Your address is confirmed. You can continue into your notes.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ) : null}
+        {status === 'success' ? (
+          <>
+            <StatusIcon tone="success" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Email verified</h1>
+              <p className="text-sm leading-6 text-ink-soft">
+                Your address is confirmed. You can continue into your notes.
+              </p>
+            </div>
+          </>
+        ) : null}
 
-          {status === 'error' ? (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>Couldn’t verify email</Alert.Title>
-                <Alert.Description>
-                  {error ||
-                    'This link is invalid or expired. Request a new verification email from your profile.'}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ) : null}
-        </Card.Content>
+        {status === 'error' ? (
+          <>
+            <StatusIcon tone="danger" />
+            <div className="grid gap-2">
+              <h1 className="text-[28px] leading-tight">Couldn’t verify email</h1>
+              <p className="text-sm leading-6 text-ink-soft">
+                {error ||
+                  'This link is invalid or expired. Request a new verification email from your profile.'}
+              </p>
+            </div>
+          </>
+        ) : null}
 
         {status !== 'verifying' ? (
-          <Card.Footer>
-            <Button fullWidth onPress={continueToApp}>
-              {status === 'success' ? 'Continue to app' : 'Back to app'}
-            </Button>
-          </Card.Footer>
+          <Button size="lg" fullWidth className="mt-2" onClick={continueToApp}>
+            {status === 'success' ? 'Continue to app' : 'Back to app'}
+          </Button>
         ) : null}
-      </Card>
-    </div>
+      </div>
+    </AuthShell>
   )
 }

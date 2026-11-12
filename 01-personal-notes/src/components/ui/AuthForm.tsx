@@ -1,14 +1,11 @@
 import type { FormEvent } from 'react'
-import {
-  Alert,
-  Button,
-  Card,
-  Input,
-  Label,
-  Separator,
-  TextField,
-} from '@heroui/react'
-import { GithubIcon, GoogleIcon } from './icons'
+import { Alert } from './Alert'
+import { AuthShell } from './AuthShell'
+import { Button } from './Button'
+import { Divider } from './Divider'
+import { ArrowLeftIcon, GithubIcon, GoogleIcon } from './icons'
+import { LinkButton } from './LinkButton'
+import { TextField } from './TextField'
 
 export type AuthMode = 'login' | 'register' | 'forgot-password'
 
@@ -42,7 +39,6 @@ export function AuthForm({
   onModeChange,
 }: AuthFormProps) {
   const isLogin = mode === 'login'
-  const isRegister = mode === 'register'
   const isForgotPassword = mode === 'forgot-password'
 
   const title = isForgotPassword
@@ -57,145 +53,131 @@ export function AuthForm({
       ? 'Sign in with email and password, Google, or GitHub.'
       : 'Register with email and password, Google, or GitHub.'
 
+  const submitLabel = submitting
+    ? isForgotPassword
+      ? 'Sending…'
+      : isLogin
+        ? 'Signing in…'
+        : 'Creating account…'
+    : isForgotPassword
+      ? 'Send reset link'
+      : isLogin
+        ? 'Sign in'
+        : 'Register'
+
   return (
-    <div className="grid min-h-svh place-items-center p-6">
-      <Card className="w-full max-w-[420px]">
-        <Card.Header className="gap-1">
-          <h1 className="text-3xl">{title}</h1>
-          <Card.Description>{description}</Card.Description>
-        </Card.Header>
+    <AuthShell>
+      <div className="grid gap-2 text-center">
+        <h1 className="text-[28px] leading-tight">{title}</h1>
+        <p className="text-sm leading-6 text-ink-soft">{description}</p>
+      </div>
 
-        <form className="contents" onSubmit={onSubmit}>
-          <Card.Content>
-            <div className="grid gap-4">
-              {error ? (
-                <Alert status="danger">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Description className="whitespace-pre-line">
-                      {error}
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              ) : null}
+      <form className="mt-8 grid gap-5" onSubmit={onSubmit}>
+        {error ? (
+          <Alert status="danger">
+            <span className="whitespace-pre-line">{error}</span>
+          </Alert>
+        ) : null}
 
-              {success ? (
-                <Alert status="success">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Description>{success}</Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              ) : null}
+        {success ? <Alert status="success">{success}</Alert> : null}
 
-              <TextField
-                isRequired
-                fullWidth
-                variant="secondary"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={onEmailChange}
-              >
-                <Label>Email</Label>
-                <Input />
-              </TextField>
+        <TextField
+          label="Email"
+          required
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => onEmailChange(event.target.value)}
+        />
 
-              {!isForgotPassword ? (
-                <TextField
-                  isRequired
-                  fullWidth
-                  variant="secondary"
-                  name="password"
-                  type="password"
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                  minLength={6}
-                  value={password}
-                  onChange={onPasswordChange}
+        {!isForgotPassword ? (
+          <TextField
+            label="Password"
+            labelAction={
+              isLogin ? (
+                <LinkButton
+                  className="text-[13px]"
+                  onClick={() => onModeChange('forgot-password')}
                 >
-                  <Label>Password</Label>
-                  <Input />
-                </TextField>
-              ) : null}
+                  Forgot password?
+                </LinkButton>
+              ) : null
+            }
+            required
+            name="password"
+            type="password"
+            autoComplete={isLogin ? 'current-password' : 'new-password'}
+            minLength={6}
+            placeholder={isLogin ? 'Enter your password' : 'At least 6 characters'}
+            value={password}
+            onChange={(event) => onPasswordChange(event.target.value)}
+          />
+        ) : null}
 
-              <Button type="submit" fullWidth isDisabled={submitting}>
-                {submitting
-                  ? isForgotPassword
-                    ? 'Sending…'
-                    : isLogin
-                      ? 'Signing in…'
-                      : 'Creating account…'
-                  : isForgotPassword
-                    ? 'Send reset link'
-                    : isLogin
-                      ? 'Sign in'
-                      : 'Register'}
-              </Button>
+        <Button
+          type="submit"
+          size="lg"
+          fullWidth
+          className="mt-1"
+          loading={submitting}
+          disabled={submitting}
+        >
+          {submitLabel}
+        </Button>
+      </form>
 
-              {!isForgotPassword ? (
-                <>
-                  {isLogin ? (
-                    <div className="flex justify-center">
-                      <Button
-                        variant="ghost"
-                        onPress={() => onModeChange('forgot-password')}
-                      >
-                        Forgot password?
-                      </Button>
-                    </div>
-                  ) : null}
+      {!isForgotPassword ? (
+        <>
+          <Divider className="my-7">or</Divider>
 
-                  <div className="flex items-center gap-3 text-sm text-muted">
-                    <Separator className="flex-1" />
-                    <span>or</span>
-                    <Separator className="flex-1" />
-                  </div>
+          <div className="grid gap-3">
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              disabled={submitting}
+              onClick={onGoogleAuth}
+            >
+              <GoogleIcon />
+              {isLogin ? 'Continue with Google' : 'Sign up with Google'}
+            </Button>
 
-                  <div className="grid gap-2">
-                    <Button
-                      variant="tertiary"
-                      fullWidth
-                      isDisabled={submitting}
-                      onPress={onGoogleAuth}
-                    >
-                      <GoogleIcon />
-                      {isLogin ? 'Continue with Google' : 'Sign up with Google'}
-                    </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              disabled={submitting}
+              onClick={onGithubAuth}
+            >
+              <GithubIcon />
+              {isLogin ? 'Continue with GitHub' : 'Sign up with GitHub'}
+            </Button>
+          </div>
+        </>
+      ) : null}
 
-                    <Button
-                      variant="tertiary"
-                      fullWidth
-                      isDisabled={submitting}
-                      onPress={onGithubAuth}
-                    >
-                      <GithubIcon />
-                      {isLogin ? 'Continue with GitHub' : 'Sign up with GitHub'}
-                    </Button>
-                  </div>
-                </>
-              ) : null}
-
-              <div className="flex justify-center">
-                {isForgotPassword || isRegister ? (
-                  <Button variant="ghost" onPress={() => onModeChange('login')}>
-                    {isForgotPassword
-                      ? 'Back to sign in'
-                      : 'Already have an account? Sign in'}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    onPress={() => onModeChange('register')}
-                  >
-                    Create an account
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Card.Content>
-        </form>
-      </Card>
-    </div>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 border-t border-line pt-6 text-sm text-ink-soft">
+        {isForgotPassword ? (
+          <LinkButton onClick={() => onModeChange('login')}>
+            <ArrowLeftIcon />
+            Back to sign in
+          </LinkButton>
+        ) : isLogin ? (
+          <>
+            <span>New here?</span>
+            <LinkButton onClick={() => onModeChange('register')}>
+              Create an account
+            </LinkButton>
+          </>
+        ) : (
+          <>
+            <span>Already have an account?</span>
+            <LinkButton onClick={() => onModeChange('login')}>Sign in</LinkButton>
+          </>
+        )}
+      </div>
+    </AuthShell>
   )
 }

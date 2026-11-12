@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { User } from 'firebase/auth'
-import { Alert, Button, Card, Chip } from '@heroui/react'
 import { useAuth } from '../context/AuthContext'
+import { Alert, Badge, Button, Card, PageHeader } from './ui'
 
 type ProfilePanelProps = {
   user: User
+}
+
+function ProfileRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-1.5 px-6 py-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center sm:gap-6">
+      <dt className="text-[13px] font-semibold text-muted">{label}</dt>
+      <dd className="text-[15px] text-ink">{children}</dd>
+    </div>
+  )
 }
 
 export function ProfilePanel({ user }: ProfilePanelProps) {
@@ -38,84 +47,43 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   }
 
   return (
-    <div className="grid w-full max-w-3xl gap-5">
-      <header>
-        <h1 className="text-3xl sm:text-4xl">Profile</h1>
-        <p className="mt-1 text-sm text-muted">
-          Your Firebase Auth user information.
-        </p>
-      </header>
+    <div className="grid w-full max-w-3xl animate-rise gap-8">
+      <PageHeader title="Profile" description="Your Firebase Auth user information." />
 
-      {error ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{error}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
-      {message ? (
-        <Alert status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{message}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+      {error || message ? (
+        <div className="grid gap-3">
+          {error ? <Alert status="danger">{error}</Alert> : null}
+          {message ? <Alert status="success">{message}</Alert> : null}
+        </div>
       ) : null}
 
       <Card>
-        <Card.Content>
-          <dl className="grid gap-4">
-            <div>
-              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
-                Email
-              </dt>
-              <dd className="mt-1 text-foreground">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
-                User ID
-              </dt>
-              <dd className="mt-1 font-mono text-sm break-all text-foreground">{user.uid}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
-                Email verified
-              </dt>
-              <dd className="mt-1 flex flex-wrap items-center gap-3">
-                <Chip
-                  color={user.emailVerified ? 'success' : 'warning'}
+        <dl className="divide-y divide-line">
+          <ProfileRow label="Email">{user.email}</ProfileRow>
+          <ProfileRow label="User ID">
+            <span className="font-mono text-[13px] break-all text-ink-soft">{user.uid}</span>
+          </ProfileRow>
+          <ProfileRow label="Email verified">
+            <span className="flex flex-wrap items-center gap-3">
+              <Badge tone={user.emailVerified ? 'success' : 'warning'}>
+                {user.emailVerified ? 'Verified' : 'Not verified'}
+              </Badge>
+              {!user.emailVerified ? (
+                <Button
+                  variant="secondary"
                   size="sm"
-                  variant="soft"
+                  loading={sending}
+                  disabled={sending}
+                  onClick={handleSendVerification}
                 >
-                  {user.emailVerified ? 'Verified' : 'Not verified'}
-                </Chip>
-                {!user.emailVerified ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    isDisabled={sending}
-                    onPress={handleSendVerification}
-                  >
-                    {sending ? 'Sending…' : 'Send Verification Email'}
-                  </Button>
-                ) : null}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
-                Account created
-              </dt>
-              <dd className="mt-1 text-foreground">{createdAt}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-bold tracking-wide text-muted uppercase">
-                Last sign-in
-              </dt>
-              <dd className="mt-1 text-foreground">{lastSignIn}</dd>
-            </div>
-          </dl>
-        </Card.Content>
+                  {sending ? 'Sending…' : 'Send Verification Email'}
+                </Button>
+              ) : null}
+            </span>
+          </ProfileRow>
+          <ProfileRow label="Account created">{createdAt}</ProfileRow>
+          <ProfileRow label="Last sign-in">{lastSignIn}</ProfileRow>
+        </dl>
       </Card>
     </div>
   )
