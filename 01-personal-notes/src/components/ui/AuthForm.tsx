@@ -95,16 +95,6 @@ export function AuthForm({
         {!isForgotPassword ? (
           <TextField
             label="Password"
-            labelAction={
-              isLogin ? (
-                <LinkButton
-                  className="text-[13px]"
-                  onClick={() => onModeChange('forgot-password')}
-                >
-                  Forgot password?
-                </LinkButton>
-              ) : null
-            }
             required
             name="password"
             type="password"
@@ -114,6 +104,17 @@ export function AuthForm({
             value={password}
             onChange={(event) => onPasswordChange(event.target.value)}
           />
+        ) : null}
+
+        {isLogin ? (
+          <div className="-mt-2 flex justify-end">
+            <LinkButton
+              className="text-[13px]"
+              onClick={() => onModeChange('forgot-password')}
+            >
+              Forgot password?
+            </LinkButton>
+          </div>
         ) : null}
 
         <Button

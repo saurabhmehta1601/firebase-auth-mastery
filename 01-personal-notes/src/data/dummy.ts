@@ -23,7 +23,7 @@ export const dummyNotes: Note[] = [
     id: '3',
     title: 'App ideas',
     content:
-      'Personal notes with per-user ownership. Later: shared notebooks and tags.',
+      'AI Notetaker with per-user ownership. Later: shared notebooks and tags.',
     updatedAt: 'Nov 8, 2026 · 11:05 AM',
   },
 ]

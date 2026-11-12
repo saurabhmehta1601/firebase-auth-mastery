@@ -17,7 +17,7 @@
     "providers": {
       "emailPassword": true,
       "googleSignIn": {
-        "oAuthBrandDisplayName": "Personal Notes",
+        "oAuthBrandDisplayName": "AI Notetaker",
         "supportEmail": "saurabhmehta1601@gmail.com",
         "authorizedRedirectUris": [
           "https://master-firebase-auth-yt.firebaseapp.com/__/auth/handler",
