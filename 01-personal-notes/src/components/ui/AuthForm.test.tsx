@@ -8,6 +8,7 @@ type AuthFormProps = {
   email?: string
   password?: string
   error?: string
+  success?: string
   submitting?: boolean
 }
 
@@ -16,6 +17,7 @@ function renderAuthForm({
   email = '',
   password = '',
   error = '',
+  success = '',
   submitting = false,
 }: AuthFormProps = {}) {
   const props = {
@@ -23,6 +25,7 @@ function renderAuthForm({
     email,
     password,
     error,
+    success,
     submitting,
     onEmailChange: vi.fn(),
     onPasswordChange: vi.fn(),
@@ -74,11 +77,13 @@ describe('AuthForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }))
     fireEvent.click(screen.getByRole('button', { name: 'Continue with GitHub' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
 
     expect(props.onSubmit).toHaveBeenCalledOnce()
     expect(props.onGoogleAuth).toHaveBeenCalledOnce()
     expect(props.onGithubAuth).toHaveBeenCalledOnce()
+    expect(props.onModeChange).toHaveBeenCalledWith('forgot-password')
     expect(props.onModeChange).toHaveBeenCalledWith('register')
   })
 
@@ -109,6 +114,31 @@ describe('AuthForm', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Already have an account? Sign in' }),
     )
+    expect(props.onModeChange).toHaveBeenCalledWith('login')
+  })
+
+  it('renders the forgot-password form and switches back to sign-in', () => {
+    const props = renderAuthForm({
+      mode: 'forgot-password',
+      email: 'ada@example.com',
+      success: 'If an account exists for that email, a password reset link has been sent.',
+    })
+
+    expect(screen.getByRole('heading', { name: 'Forgot password' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Enter your email and we will send a password reset link.'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveValue('ada@example.com')
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'If an account exists for that email, a password reset link has been sent.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send reset link' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to sign in' }))
     expect(props.onModeChange).toHaveBeenCalledWith('login')
   })
 })

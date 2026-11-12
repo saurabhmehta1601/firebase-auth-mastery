@@ -10,13 +10,14 @@ import {
 } from '@heroui/react'
 import { GithubIcon, GoogleIcon } from './icons'
 
-export type AuthMode = 'login' | 'register'
+export type AuthMode = 'login' | 'register' | 'forgot-password'
 
 type AuthFormProps = {
   mode: AuthMode
   email: string
   password: string
   error: string
+  success: string
   submitting: boolean
   onEmailChange: (value: string) => void
   onPasswordChange: (value: string) => void
@@ -31,6 +32,7 @@ export function AuthForm({
   email,
   password,
   error,
+  success,
   submitting,
   onEmailChange,
   onPasswordChange,
@@ -40,17 +42,27 @@ export function AuthForm({
   onModeChange,
 }: AuthFormProps) {
   const isLogin = mode === 'login'
+  const isRegister = mode === 'register'
+  const isForgotPassword = mode === 'forgot-password'
+
+  const title = isForgotPassword
+    ? 'Forgot password'
+    : isLogin
+      ? 'Welcome back'
+      : 'Create account'
+
+  const description = isForgotPassword
+    ? 'Enter your email and we will send a password reset link.'
+    : isLogin
+      ? 'Sign in with email and password, Google, or GitHub.'
+      : 'Register with email and password, Google, or GitHub.'
 
   return (
     <div className="grid min-h-svh place-items-center p-6">
       <Card className="w-full max-w-[420px]">
         <Card.Header className="gap-1">
-          <h1 className="text-3xl">{isLogin ? 'Welcome back' : 'Create account'}</h1>
-          <Card.Description>
-            {isLogin
-              ? 'Sign in with email and password, Google, or GitHub.'
-              : 'Register with email and password, Google, or GitHub.'}
-          </Card.Description>
+          <h1 className="text-3xl">{title}</h1>
+          <Card.Description>{description}</Card.Description>
         </Card.Header>
 
         <form className="contents" onSubmit={onSubmit}>
@@ -63,6 +75,15 @@ export function AuthForm({
                     <Alert.Description className="whitespace-pre-line">
                       {error}
                     </Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              ) : null}
+
+              {success ? (
+                <Alert status="success">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{success}</Alert.Description>
                   </Alert.Content>
                 </Alert>
               ) : null}
@@ -81,67 +102,93 @@ export function AuthForm({
                 <Input />
               </TextField>
 
-              <TextField
-                isRequired
-                fullWidth
-                variant="secondary"
-                name="password"
-                type="password"
-                autoComplete={isLogin ? 'current-password' : 'new-password'}
-                minLength={6}
-                value={password}
-                onChange={onPasswordChange}
-              >
-                <Label>Password</Label>
-                <Input />
-              </TextField>
+              {!isForgotPassword ? (
+                <TextField
+                  isRequired
+                  fullWidth
+                  variant="secondary"
+                  name="password"
+                  type="password"
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  minLength={6}
+                  value={password}
+                  onChange={onPasswordChange}
+                >
+                  <Label>Password</Label>
+                  <Input />
+                </TextField>
+              ) : null}
 
               <Button type="submit" fullWidth isDisabled={submitting}>
                 {submitting
-                  ? isLogin
-                    ? 'Signing in…'
-                    : 'Creating account…'
-                  : isLogin
-                    ? 'Sign in'
-                    : 'Register'}
+                  ? isForgotPassword
+                    ? 'Sending…'
+                    : isLogin
+                      ? 'Signing in…'
+                      : 'Creating account…'
+                  : isForgotPassword
+                    ? 'Send reset link'
+                    : isLogin
+                      ? 'Sign in'
+                      : 'Register'}
               </Button>
 
-              <div className="flex items-center gap-3 text-sm text-muted">
-                <Separator className="flex-1" />
-                <span>or</span>
-                <Separator className="flex-1" />
-              </div>
+              {!isForgotPassword ? (
+                <>
+                  {isLogin ? (
+                    <div className="flex justify-center">
+                      <Button
+                        variant="ghost"
+                        onPress={() => onModeChange('forgot-password')}
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
+                  ) : null}
 
-              <div className="grid gap-2">
-                <Button
-                  variant="tertiary"
-                  fullWidth
-                  isDisabled={submitting}
-                  onPress={onGoogleAuth}
-                >
-                  <GoogleIcon />
-                  {isLogin ? 'Continue with Google' : 'Sign up with Google'}
-                </Button>
+                  <div className="flex items-center gap-3 text-sm text-muted">
+                    <Separator className="flex-1" />
+                    <span>or</span>
+                    <Separator className="flex-1" />
+                  </div>
 
-                <Button
-                  variant="tertiary"
-                  fullWidth
-                  isDisabled={submitting}
-                  onPress={onGithubAuth}
-                >
-                  <GithubIcon />
-                  {isLogin ? 'Continue with GitHub' : 'Sign up with GitHub'}
-                </Button>
-              </div>
+                  <div className="grid gap-2">
+                    <Button
+                      variant="tertiary"
+                      fullWidth
+                      isDisabled={submitting}
+                      onPress={onGoogleAuth}
+                    >
+                      <GoogleIcon />
+                      {isLogin ? 'Continue with Google' : 'Sign up with Google'}
+                    </Button>
+
+                    <Button
+                      variant="tertiary"
+                      fullWidth
+                      isDisabled={submitting}
+                      onPress={onGithubAuth}
+                    >
+                      <GithubIcon />
+                      {isLogin ? 'Continue with GitHub' : 'Sign up with GitHub'}
+                    </Button>
+                  </div>
+                </>
+              ) : null}
 
               <div className="flex justify-center">
-                {isLogin ? (
-                  <Button variant="ghost" onPress={() => onModeChange('register')}>
-                    Create an account
+                {isForgotPassword || isRegister ? (
+                  <Button variant="ghost" onPress={() => onModeChange('login')}>
+                    {isForgotPassword
+                      ? 'Back to sign in'
+                      : 'Already have an account? Sign in'}
                   </Button>
                 ) : (
-                  <Button variant="ghost" onPress={() => onModeChange('login')}>
-                    Already have an account? Sign in
+                  <Button
+                    variant="ghost"
+                    onPress={() => onModeChange('register')}
+                  >
+                    Create an account
                   </Button>
                 )}
               </div>

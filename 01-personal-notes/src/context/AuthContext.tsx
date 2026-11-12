@@ -11,6 +11,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -30,6 +31,7 @@ type AuthContextValue = {
   loginWithGithub: () => Promise<void>
   logout: () => Promise<void>
   sendVerificationEmail: () => Promise<void>
+  sendPasswordReset: (email: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -75,6 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  async function sendPasswordReset(email: string) {
+    await sendPasswordResetEmail(auth, email, {
+      url: window.location.origin,
+      handleCodeInApp: true,
+    })
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -86,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGithub,
         logout,
         sendVerificationEmail,
+        sendPasswordReset,
       }}
     >
       {children}

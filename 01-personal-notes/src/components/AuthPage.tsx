@@ -59,20 +59,28 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function AuthPage() {
-  const { login, register, loginWithGoogle, loginWithGithub } = useAuth()
+  const { login, register, loginWithGoogle, loginWithGithub, sendPasswordReset } =
+    useAuth()
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    setSuccess('')
     setSubmitting(true)
 
     try {
-      if (mode === 'login') {
+      if (mode === 'forgot-password') {
+        await sendPasswordReset(email.trim())
+        setSuccess(
+          'If an account exists for that email, a password reset link has been sent.',
+        )
+      } else if (mode === 'login') {
         await login(email.trim(), password)
       } else {
         await register(email.trim(), password)
@@ -86,6 +94,7 @@ export function AuthPage() {
 
   async function handleGoogleAuth() {
     setError('')
+    setSuccess('')
     setSubmitting(true)
 
     try {
@@ -99,6 +108,7 @@ export function AuthPage() {
 
   async function handleGithubAuth() {
     setError('')
+    setSuccess('')
     setSubmitting(true)
 
     try {
@@ -116,6 +126,7 @@ export function AuthPage() {
       email={email}
       password={password}
       error={error}
+      success={success}
       submitting={submitting}
       onEmailChange={setEmail}
       onPasswordChange={setPassword}
@@ -125,6 +136,7 @@ export function AuthPage() {
       onModeChange={(nextMode) => {
         setMode(nextMode)
         setError('')
+        setSuccess('')
       }}
     />
   )

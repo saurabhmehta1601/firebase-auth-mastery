@@ -4,6 +4,7 @@ import { NotesPanel } from './components/NotesPanel'
 import { ProfilePanel } from './components/ProfilePanel'
 import { SessionLoadingPage } from './components/SessionLoadingPage'
 import { Sidebar, type Tab } from './components/Sidebar'
+import { ResetPasswordPage } from './components/ResetPasswordPage'
 import { VerifyEmailPage } from './components/VerifyEmailPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { dummyNotes } from './data/dummy'
@@ -20,6 +21,10 @@ function AppShell() {
   const { user, loading, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('notes')
   const { mode, oobCode } = getEmailActionParams()
+
+  if (mode === 'resetPassword' && oobCode) {
+    return <ResetPasswordPage oobCode={oobCode} />
+  }
 
   if (mode === 'verifyEmail' && oobCode) {
     return <VerifyEmailPage oobCode={oobCode} />
