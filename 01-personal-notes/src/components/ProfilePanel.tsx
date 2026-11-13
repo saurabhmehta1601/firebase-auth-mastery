@@ -31,6 +31,24 @@ function ProfileRow({ label, children }: { label: string; children: ReactNode })
   )
 }
 
+function formatProfileDateTime(value?: string) {
+  if (!value) return 'Unknown'
+
+  const date = new Date(value)
+  const day = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const time = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+
+  return `${day}, ${time}`
+}
+
 function reauthPrompt(providerId: ReauthProviderId, purpose: 'enable' | 'disable') {
   if (purpose === 'disable') {
     if (providerId === 'password') {
@@ -168,12 +186,8 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   const [providerId, setProviderId] = useState<ReauthProviderId | null>(null)
   const [enrolledCount, setEnrolledCount] = useState(() => enrolledFactorCount(user))
 
-  const createdAt = user.metadata.creationTime
-    ? new Date(user.metadata.creationTime).toLocaleString()
-    : 'Unknown'
-  const lastSignIn = user.metadata.lastSignInTime
-    ? new Date(user.metadata.lastSignInTime).toLocaleString()
-    : 'Unknown'
+  const createdAt = formatProfileDateTime(user.metadata.creationTime)
+  const lastSignIn = formatProfileDateTime(user.metadata.lastSignInTime)
   const mfaEnabled = enrolledCount > 0
 
   function resetFlow() {

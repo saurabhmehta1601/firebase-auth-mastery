@@ -7,7 +7,6 @@ export type Tab = 'profile' | 'notes'
 type SidebarProps = {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
-  email: string
   onLogout: () => void | Promise<void>
 }
 
@@ -43,12 +42,7 @@ function NavItem({ label, icon: Icon, active, onSelect }: NavItemProps) {
   )
 }
 
-export function Sidebar({
-  activeTab,
-  onTabChange,
-  email,
-  onLogout,
-}: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onLogout }: SidebarProps) {
   return (
     <aside className="flex flex-col gap-6 border-b border-line bg-surface/70 px-4 py-5 backdrop-blur-xl min-[841px]:sticky min-[841px]:top-0 min-[841px]:h-svh min-[841px]:gap-8 min-[841px]:border-r min-[841px]:border-b-0 min-[841px]:py-6">
       <div className="px-2">
@@ -70,22 +64,10 @@ export function Sidebar({
         />
       </nav>
 
-      <div className="mt-auto flex items-center gap-3 rounded-xl border border-line bg-surface p-2.5 shadow-xs">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent-strong uppercase">
-          {email.charAt(0)}
-        </span>
-        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink" title={email}>
-          {email}
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="size-8 px-0"
-          aria-label="Log out"
-          title="Log out"
-          onClick={() => onLogout()}
-        >
+      <div className="mt-auto">
+        <Button variant="danger" size="sm" fullWidth onClick={() => onLogout()}>
           <LogOutIcon />
+          Logout
         </Button>
       </div>
     </aside>

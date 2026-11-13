@@ -44,7 +44,6 @@ function AppShell() {
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        email={user.email ?? 'Signed in'}
         onLogout={auth.logout}
       />
 

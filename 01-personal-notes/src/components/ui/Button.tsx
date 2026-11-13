@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cn, focusRing } from './cn'
 import { Spinner } from './Spinner'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const variants: Record<ButtonVariant, string> = {
@@ -10,6 +10,8 @@ const variants: Record<ButtonVariant, string> = {
   secondary:
     'border border-line bg-surface text-ink shadow-xs hover:border-line-strong hover:bg-paper',
   ghost: 'text-ink-soft hover:bg-ink/[0.05] hover:text-ink',
+  danger:
+    'border border-rose-300 bg-surface text-rose-700 shadow-xs hover:border-rose-400 hover:bg-rose-50',
 }
 
 const sizes: Record<ButtonSize, string> = {
