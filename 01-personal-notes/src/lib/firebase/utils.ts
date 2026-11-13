@@ -64,6 +64,55 @@ export function formatPasswordRequirementsError(message: string): string {
     .join('\n')}`
 }
 
+function providerLabel(providerId: string): string | null {
+  switch (providerId) {
+    case 'google.com':
+      return 'Google sign-in'
+    case 'github.com':
+      return 'GitHub sign-in'
+    case 'password':
+      return 'email/password'
+    default:
+      return null
+  }
+}
+
+function formatExistingAccountMessage(methods: string[]): string {
+  const labels = methods
+    .map(providerLabel)
+    .filter((label): label is string => label !== null)
+
+  if (labels.length === 1) {
+    return `An account already exists with this email using ${labels[0]}.`
+  }
+
+  if (labels.length > 1) {
+    return `An account already exists with this email using ${labels.join(' or ')}.`
+  }
+
+  return 'An account already exists with this email.'
+}
+
+/** Providers already linked to this email, from the failed signInWithIdp response. */
+function verifiedProvidersFromError(error: FirebaseError): string[] {
+  const tokenResponse = (
+    error.customData as { _tokenResponse?: Record<string, unknown> } | undefined
+  )?._tokenResponse
+  if (!tokenResponse) {
+    return []
+  }
+
+  const raw =
+    tokenResponse.verifiedProvider ?? tokenResponse.verifiedProviders ?? []
+  return Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === 'string')
+    : []
+}
+
+function messageForExistingAccount(error: FirebaseError): string {
+  return formatExistingAccountMessage(verifiedProvidersFromError(error))
+}
+
 export function getSignInErrorMessage(error: unknown): string {
   if (!(error instanceof FirebaseError)) {
     return 'Something went wrong. Please try again.'
@@ -71,7 +120,8 @@ export function getSignInErrorMessage(error: unknown): string {
 
   switch (error.code) {
     case 'auth/email-already-in-use':
-      return 'An account with this email already exists.'
+    case 'auth/account-exists-with-different-credential':
+      return messageForExistingAccount(error)
     case 'auth/invalid-email':
       return 'Enter a valid email address.'
     case 'auth/weak-password':
@@ -90,8 +140,6 @@ export function getSignInErrorMessage(error: unknown): string {
       return 'Sign-in was cancelled.'
     case 'auth/popup-blocked':
       return 'Pop-up was blocked. Allow pop-ups and try again.'
-    case 'auth/account-exists-with-different-credential':
-      return 'An account already exists with this email using a different sign-in method.'
     case 'auth/operation-not-allowed':
       return 'This sign-in provider is not enabled yet.'
     case 'auth/invalid-verification-code':
