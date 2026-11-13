@@ -480,26 +480,6 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
               ) : null}
             </span>
           </ProfileRow>
-          <ProfileRow label="Two-factor authentication">
-            <span className="flex flex-wrap items-center gap-3">
-              <Badge tone={mfaEnabled ? 'success' : 'warning'}>
-                {mfaEnabled ? 'Enabled' : 'Not enabled'}
-              </Badge>
-              {flow.mode === 'idle' ? (
-                mfaEnabled ? (
-                  <Button variant="secondary" size="sm" disabled={working} onClick={startDisable}>
-                    Disable
-                  </Button>
-                ) : user.emailVerified ? (
-                  <Button variant="secondary" size="sm" disabled={working} onClick={startEnable}>
-                    Enable
-                  </Button>
-                ) : (
-                  <span className="text-[13px] text-muted">Verify your email to enable this.</span>
-                )
-              ) : null}
-            </span>
-          </ProfileRow>
           <ProfileRow label="Account created">{createdAt}</ProfileRow>
           <ProfileRow label="Last sign-in">{lastSignIn}</ProfileRow>
         </dl>
@@ -551,47 +531,130 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
         </ul>
       </Card>
 
-      {flow.mode === 'enable' && providerId ? (
-        <Card className="grid gap-5 p-6">
-          <div className="grid gap-1.5">
-            <h2 className="text-xl">Enable two-factor authentication</h2>
-            <p className="text-sm leading-6 text-ink-soft">
-              {flow.step === 'reauth'
-                ? reauthPrompt(providerId, 'enable')
-                : 'Scan the QR code with your authenticator app, or enter the setup key manually. Then enter the 6-digit code the app shows.'}
-            </p>
+      <Card className="grid gap-5 p-6">
+        <div className="grid gap-1.5">
+          <h2 className="text-xl">Two-factor authentication</h2>
+          <p className="text-sm leading-6 text-ink-soft">
+            Add an authenticator app so signing in requires a one-time code as well as your password
+            or linked provider.
+          </p>
+        </div>
+
+        {flow.mode === 'idle' ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3.5">
+            <span className="flex flex-wrap items-center gap-3">
+              <span className="text-[15px] font-medium text-ink">Authenticator app</span>
+              <Badge tone={mfaEnabled ? 'success' : 'warning'}>
+                {mfaEnabled ? 'Enabled' : 'Not enabled'}
+              </Badge>
+            </span>
+            {mfaEnabled ? (
+              <Button variant="secondary" size="sm" disabled={working} onClick={startDisable}>
+                Disable
+              </Button>
+            ) : user.emailVerified ? (
+              <Button variant="secondary" size="sm" disabled={working} onClick={startEnable}>
+                Enable
+              </Button>
+            ) : (
+              <span className="text-[13px] text-muted">Verify your email to enable this.</span>
+            )}
           </div>
-          <SetupSteps step={flow.step} />
-          {flow.step === 'reauth' ? (
-            <ReauthActions
-              providerId={providerId}
-              password={password}
-              onPasswordChange={setPassword}
-              working={working}
-              continueLabel="Continue"
-              workingLabel="Confirming…"
-              onContinue={() => void handleEnableReauth()}
-              onCancel={resetFlow}
-            />
-          ) : totpSecret ? (
-            <>
-              {qrDataUrl ? (
-                <img
-                  src={qrDataUrl}
-                  alt="Authenticator setup QR code"
-                  className="size-48 rounded-xl border border-line bg-white p-2"
-                />
-              ) : null}
-              <div className="grid gap-2">
-                <p className="text-[13px] font-semibold text-ink">Setup key</p>
-                <p className="font-mono text-[13px] break-all text-ink-soft">{totpSecret.secretKey}</p>
-                <div>
-                  <Button variant="secondary" size="sm" onClick={() => void copySecret()}>
-                    Copy key
-                  </Button>
+        ) : null}
+
+        {flow.mode === 'enable' && providerId ? (
+          <div className="grid gap-5">
+            <div className="grid gap-1.5">
+              <h3 className="text-lg font-semibold text-ink">Enable two-factor authentication</h3>
+              <p className="text-sm leading-6 text-ink-soft">
+                {flow.step === 'reauth'
+                  ? reauthPrompt(providerId, 'enable')
+                  : 'Scan the QR code with your authenticator app, or enter the setup key manually. Then enter the 6-digit code the app shows.'}
+              </p>
+            </div>
+            <SetupSteps step={flow.step} />
+            {flow.step === 'reauth' ? (
+              <ReauthActions
+                providerId={providerId}
+                password={password}
+                onPasswordChange={setPassword}
+                working={working}
+                continueLabel="Continue"
+                workingLabel="Confirming…"
+                onContinue={() => void handleEnableReauth()}
+                onCancel={resetFlow}
+              />
+            ) : totpSecret ? (
+              <>
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="Authenticator setup QR code"
+                    className="size-48 rounded-xl border border-line bg-white p-2"
+                  />
+                ) : null}
+                <div className="grid gap-2">
+                  <p className="text-[13px] font-semibold text-ink">Setup key</p>
+                  <p className="font-mono text-[13px] break-all text-ink-soft">{totpSecret.secretKey}</p>
+                  <div>
+                    <Button variant="secondary" size="sm" onClick={() => void copySecret()}>
+                      Copy key
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <form className="grid gap-5" onSubmit={handleEnroll}>
+                <form className="grid gap-5" onSubmit={handleEnroll}>
+                  <TextField
+                    label="Authenticator code"
+                    required
+                    name="otp"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    placeholder="123456"
+                    value={verificationCode}
+                    onChange={(event) =>
+                      setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                    }
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    <Button type="submit" loading={working} disabled={working}>
+                      {working ? 'Enabling…' : 'Enable two-factor authentication'}
+                    </Button>
+                    <Button variant="secondary" disabled={working} onClick={resetFlow}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {flow.mode === 'disable' && providerId ? (
+          <div className="grid gap-5">
+            <div className="grid gap-1.5">
+              <h3 className="text-lg font-semibold text-ink">Turn off two-factor authentication</h3>
+              <p className="text-sm leading-6 text-ink-soft">
+                {flow.step === 'code'
+                  ? 'Enter the code from your authenticator app to confirm it is you.'
+                  : reauthPrompt(providerId, 'disable')}
+              </p>
+            </div>
+            {flow.step === 'reauth' ? (
+              <ReauthActions
+                providerId={providerId}
+                password={password}
+                onPasswordChange={setPassword}
+                working={working}
+                continueLabel="Continue"
+                workingLabel="Confirming…"
+                onContinue={() => void handleDisableReauth()}
+                onCancel={resetFlow}
+              />
+            ) : (
+              <form className="grid gap-5" onSubmit={handleDisableCode}>
                 <TextField
                   label="Authenticator code"
                   required
@@ -609,68 +672,17 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
                 />
                 <div className="flex flex-wrap gap-3">
                   <Button type="submit" loading={working} disabled={working}>
-                    {working ? 'Enabling…' : 'Enable two-factor authentication'}
+                    {working ? 'Turning off…' : 'Turn off'}
                   </Button>
                   <Button variant="secondary" disabled={working} onClick={resetFlow}>
                     Cancel
                   </Button>
                 </div>
               </form>
-            </>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {flow.mode === 'disable' && providerId ? (
-        <Card className="grid gap-5 p-6">
-          <div className="grid gap-1.5">
-            <h2 className="text-xl">Turn off two-factor authentication</h2>
-            <p className="text-sm leading-6 text-ink-soft">
-              {flow.step === 'code'
-                ? 'Enter the code from your authenticator app to confirm it is you.'
-                : reauthPrompt(providerId, 'disable')}
-            </p>
+            )}
           </div>
-          {flow.step === 'reauth' ? (
-            <ReauthActions
-              providerId={providerId}
-              password={password}
-              onPasswordChange={setPassword}
-              working={working}
-              continueLabel="Continue"
-              workingLabel="Confirming…"
-              onContinue={() => void handleDisableReauth()}
-              onCancel={resetFlow}
-            />
-          ) : (
-            <form className="grid gap-5" onSubmit={handleDisableCode}>
-              <TextField
-                label="Authenticator code"
-                required
-                name="otp"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                minLength={6}
-                maxLength={6}
-                placeholder="123456"
-                value={verificationCode}
-                onChange={(event) =>
-                  setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                }
-              />
-              <div className="flex flex-wrap gap-3">
-                <Button type="submit" loading={working} disabled={working}>
-                  {working ? 'Turning off…' : 'Turn off'}
-                </Button>
-                <Button variant="secondary" disabled={working} onClick={resetFlow}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-        </Card>
-      ) : null}
+        ) : null}
+      </Card>
     </div>
   )
 }
