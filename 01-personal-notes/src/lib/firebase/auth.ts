@@ -7,6 +7,7 @@ import {
   confirmPasswordReset,
   createUserWithEmailAndPassword,
   getMultiFactorResolver,
+  linkWithPopup,
   multiFactor,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
@@ -99,6 +100,16 @@ async function reauthenticate(user: User, providerId: ReauthProviderId, password
   await reauthenticateWithPopup(user, new GithubAuthProvider())
 }
 
+async function linkWithGoogle(user: User) {
+  await linkWithPopup(user, new GoogleAuthProvider())
+  await user.reload()
+}
+
+async function linkWithGithub(user: User) {
+  await linkWithPopup(user, new GithubAuthProvider())
+  await user.reload()
+}
+
 async function beginTotpEnrollment(user: User) {
   const session = await multiFactor(user).getSession()
   return TotpMultiFactorGenerator.generateSecret(session)
@@ -148,6 +159,8 @@ export const auth = {
   completePasswordReset,
   getCurrentUser,
   reauthenticate,
+  linkWithGoogle,
+  linkWithGithub,
   beginTotpEnrollment,
   enrollTotp,
   unenrollAllFactors,

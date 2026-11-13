@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth'
 
 export type ReauthProviderId = 'password' | 'google.com' | 'github.com'
+export type LinkableProviderId = 'google.com' | 'github.com'
 
 export function isMultiFactorError(error: unknown): error is MultiFactorError {
   return error instanceof FirebaseError && error.code === 'auth/multi-factor-auth-required'
@@ -15,6 +16,10 @@ export function isMultiFactorError(error: unknown): error is MultiFactorError {
 
 export function isEmailPasswordUser(user: User) {
   return user.providerData.some((provider) => provider.providerId === 'password')
+}
+
+export function linkedProviderIds(user: User): string[] {
+  return user.providerData.map((provider) => provider.providerId)
 }
 
 function isReauthProviderId(value: string | null | undefined): value is ReauthProviderId {
@@ -177,6 +182,32 @@ export function getMfaErrorMessage(error: unknown): string {
       return 'Pop-up was blocked. Allow pop-ups and try again.'
     case 'auth/multi-factor-auth-required':
       return 'Enter the code from your authenticator app to continue.'
+    default:
+      return error.message
+  }
+}
+
+export function getLinkErrorMessage(error: unknown): string {
+  if (!(error instanceof FirebaseError)) {
+    return error instanceof Error ? error.message : 'Could not link that sign-in method.'
+  }
+
+  switch (error.code) {
+    case 'auth/credential-already-in-use':
+    case 'auth/email-already-in-use':
+      return 'That sign-in method is already used by another account.'
+    case 'auth/provider-already-linked':
+      return 'That sign-in method is already linked to this account.'
+    case 'auth/requires-recent-login':
+      return 'Confirm your identity again, then retry linking.'
+    case 'auth/popup-closed-by-user':
+      return 'Linking was cancelled.'
+    case 'auth/popup-blocked':
+      return 'Pop-up was blocked. Allow pop-ups and try again.'
+    case 'auth/operation-not-allowed':
+      return 'This sign-in provider is not enabled yet.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait and try again.'
     default:
       return error.message
   }

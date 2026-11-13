@@ -4,14 +4,27 @@ import { toDataURL } from 'qrcode'
 import {
   enrolledFactorCount,
   findTotpFactor,
+  getLinkErrorMessage,
   getMfaErrorMessage,
   isMultiFactorError,
+  linkedProviderIds,
   reauthProviderId,
+  type LinkableProviderId,
   type ReauthProviderId,
 } from '../lib/firebase/utils'
 import { auth } from '../lib/firebase/auth'
 import { Alert, Badge, Button, Card, GithubIcon, GoogleIcon, PageHeader, TextField } from './ui'
 import { cn } from './ui/cn'
+
+const LINKABLE_PROVIDERS: {
+  id: LinkableProviderId
+  label: string
+  linkLabel: string
+  Icon: typeof GoogleIcon
+}[] = [
+  { id: 'google.com', label: 'Google', linkLabel: 'Link Google', Icon: GoogleIcon },
+  { id: 'github.com', label: 'GitHub', linkLabel: 'Link GitHub', Icon: GithubIcon },
+]
 
 type ProfilePanelProps = {
   user: User
@@ -183,12 +196,15 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null)
   const [working, setWorking] = useState(false)
+  const [linkingProvider, setLinkingProvider] = useState<LinkableProviderId | null>(null)
   const [providerId, setProviderId] = useState<ReauthProviderId | null>(null)
   const [enrolledCount, setEnrolledCount] = useState(() => enrolledFactorCount(user))
+  const [providers, setProviders] = useState(() => linkedProviderIds(user))
 
   const createdAt = formatProfileDateTime(user.metadata.creationTime)
   const lastSignIn = formatProfileDateTime(user.metadata.lastSignInTime)
   const mfaEnabled = enrolledCount > 0
+  const passwordLinked = providers.includes('password')
 
   function resetFlow() {
     setFlow({ mode: 'idle' })
@@ -403,6 +419,32 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     }
   }
 
+  async function handleLinkProvider(provider: LinkableProviderId) {
+    setMessage('')
+    setError('')
+    setLinkingProvider(provider)
+
+    try {
+      if (provider === 'google.com') {
+        await auth.linkWithGoogle(user)
+      } else {
+        await auth.linkWithGithub(user)
+      }
+
+      const currentUser = await requireCurrentUser()
+      setProviders(linkedProviderIds(currentUser))
+      setMessage(
+        provider === 'google.com'
+          ? 'Google is linked. You can sign in with Google next time.'
+          : 'GitHub is linked. You can sign in with GitHub next time.',
+      )
+    } catch (err) {
+      setError(getLinkErrorMessage(err))
+    } finally {
+      setLinkingProvider(null)
+    }
+  }
+
   return (
     <div className="grid w-full max-w-3xl animate-rise gap-8">
       <PageHeader title="Profile" description="Your Firebase Auth user information." />
@@ -461,6 +503,52 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
           <ProfileRow label="Account created">{createdAt}</ProfileRow>
           <ProfileRow label="Last sign-in">{lastSignIn}</ProfileRow>
         </dl>
+      </Card>
+
+      <Card className="grid gap-5 p-6">
+        <div className="grid gap-1.5">
+          <h2 className="text-xl">Sign-in methods</h2>
+          <p className="text-sm leading-6 text-ink-soft">
+            Link Google or GitHub to this account so you can sign in with any connected method.
+          </p>
+        </div>
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+            <span className="text-[15px] font-medium text-ink">Email/password</span>
+            <Badge tone={passwordLinked ? 'success' : 'warning'}>
+              {passwordLinked ? 'Linked' : 'Not linked'}
+            </Badge>
+          </li>
+          {LINKABLE_PROVIDERS.map(({ id, label, linkLabel, Icon }) => {
+            const linked = providers.includes(id)
+            const busy = linkingProvider === id
+            return (
+              <li
+                key={id}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5"
+              >
+                <span className="flex items-center gap-2.5 text-[15px] font-medium text-ink">
+                  <Icon />
+                  {label}
+                </span>
+                {linked ? (
+                  <Badge tone="success">Linked</Badge>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={busy}
+                    disabled={linkingProvider !== null || working}
+                    onClick={() => void handleLinkProvider(id)}
+                  >
+                    <Icon />
+                    {busy ? 'Linking…' : linkLabel}
+                  </Button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       </Card>
 
       {flow.mode === 'enable' && providerId ? (

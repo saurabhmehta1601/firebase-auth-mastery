@@ -8,6 +8,8 @@ vi.mock('../lib/firebase/auth', () => ({
     getCurrentUser: vi.fn(),
     sendVerificationEmail: vi.fn(),
     reauthenticate: vi.fn(),
+    linkWithGoogle: vi.fn(),
+    linkWithGithub: vi.fn(),
     beginTotpEnrollment: vi.fn(),
     enrollTotp: vi.fn(),
     unenrollAllFactors: vi.fn(),
@@ -71,5 +73,24 @@ describe('two-factor reauthentication step', () => {
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sign in with Google' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sign in with GitHub' })).not.toBeInTheDocument()
+  })
+})
+
+describe('sign-in method linking', () => {
+  it('shows link actions for providers that are not connected yet', () => {
+    render(<ProfilePanel user={userWith('password', ['password'])} />)
+
+    expect(screen.getByRole('heading', { name: 'Sign-in methods' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Link Google' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Link GitHub' })).toBeInTheDocument()
+    expect(screen.getAllByText('Linked')).toHaveLength(1)
+  })
+
+  it('marks already-linked providers without offering another link action', () => {
+    render(<ProfilePanel user={userWith('google.com', ['password', 'google.com'])} />)
+
+    expect(screen.queryByRole('button', { name: 'Link Google' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Link GitHub' })).toBeInTheDocument()
+    expect(screen.getAllByText('Linked')).toHaveLength(2)
   })
 })
