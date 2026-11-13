@@ -459,9 +459,6 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
       <Card>
         <dl className="divide-y divide-line">
           <ProfileRow label="Email">{user.email}</ProfileRow>
-          <ProfileRow label="User ID">
-            <span className="font-mono text-[13px] break-all text-ink-soft">{user.uid}</span>
-          </ProfileRow>
           <ProfileRow label="Email verified">
             <span className="flex flex-wrap items-center gap-3">
               <Badge tone={user.emailVerified ? 'success' : 'warning'}>
