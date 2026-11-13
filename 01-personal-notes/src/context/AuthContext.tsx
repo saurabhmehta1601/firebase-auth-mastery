@@ -5,33 +5,12 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  createUserWithEmailAndPassword,
-  GithubAuthProvider,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  type User,
-} from 'firebase/auth'
-import { auth } from '../firebase'
-
-const googleProvider = new GoogleAuthProvider()
-const githubProvider = new GithubAuthProvider()
+import { onAuthStateChanged, type User } from 'firebase/auth'
+import { auth } from '../lib/firebase/firebase'
 
 type AuthContextValue = {
   user: User | null
   loading: boolean
-  register: (email: string, password: string) => Promise<void>
-  login: (email: string, password: string) => Promise<void>
-  loginWithGoogle: () => Promise<void>
-  loginWithGithub: () => Promise<void>
-  logout: () => Promise<void>
-  sendVerificationEmail: () => Promise<void>
-  sendPasswordReset: (email: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -47,60 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  async function register(email: string, password: string) {
-    await createUserWithEmailAndPassword(auth, email, password)
-  }
-
-  async function login(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password)
-  }
-
-  async function loginWithGoogle() {
-    await signInWithPopup(auth, googleProvider)
-  }
-
-  async function loginWithGithub() {
-    await signInWithPopup(auth, githubProvider)
-  }
-
-  async function logout() {
-    await signOut(auth)
-  }
-
-  async function sendVerificationEmail() {
-    if (!auth.currentUser) {
-      throw new Error('No signed-in user to verify.')
-    }
-    await sendEmailVerification(auth.currentUser, {
-      url: window.location.origin,
-      handleCodeInApp: false,
-    })
-  }
-
-  async function sendPasswordReset(email: string) {
-    await sendPasswordResetEmail(auth, email, {
-      url: window.location.origin,
-      handleCodeInApp: true,
-    })
-  }
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        register,
-        login,
-        loginWithGoogle,
-        loginWithGithub,
-        logout,
-        sendVerificationEmail,
-        sendPasswordReset,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

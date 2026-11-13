@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { applyActionCode } from 'firebase/auth'
-import { auth } from '../firebase'
+import { auth } from '../lib/firebase/auth'
 import { AuthShell, Button, StatusIcon } from './ui'
 
 type Status = 'verifying' | 'success' | 'error'
@@ -18,10 +17,7 @@ export function VerifyEmailPage({ oobCode }: VerifyEmailPageProps) {
 
     async function verify() {
       try {
-        await applyActionCode(auth, oobCode)
-        if (auth.currentUser) {
-          await auth.currentUser.reload()
-        }
+        await auth.applyEmailVerification(oobCode)
         if (!cancelled) {
           setStatus('success')
         }

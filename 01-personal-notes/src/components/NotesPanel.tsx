@@ -1,19 +1,16 @@
 import { useState } from 'react'
-import type { User } from 'firebase/auth'
 import type { Note } from '../data/dummy'
 import { useAuth } from '../context/AuthContext'
+import { auth } from '../lib/firebase/auth'
+import { isEmailPasswordUser } from '../lib/firebase/utils'
 import { Alert, Button, Card, NotesIcon, PageHeader } from './ui'
 
 type NotesPanelProps = {
   notes: Note[]
 }
 
-function isEmailPasswordUser(user: User) {
-  return user.providerData.some((provider) => provider.providerId === 'password')
-}
-
 export function NotesPanel({ notes }: NotesPanelProps) {
-  const { user, sendVerificationEmail } = useAuth()
+  const { user } = useAuth()
   const [dismissed, setDismissed] = useState(false)
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState('')
@@ -28,7 +25,7 @@ export function NotesPanel({ notes }: NotesPanelProps) {
     setSending(true)
 
     try {
-      await sendVerificationEmail()
+      await auth.sendVerificationEmail()
       setMessage('Verification email sent. Check your inbox.')
     } catch (err) {
       setError(

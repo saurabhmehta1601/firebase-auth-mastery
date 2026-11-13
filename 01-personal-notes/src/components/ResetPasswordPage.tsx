@@ -1,49 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { FirebaseError } from 'firebase/app'
-import {
-  confirmPasswordReset,
-  verifyPasswordResetCode,
-} from 'firebase/auth'
-import { auth } from '../firebase'
+import { auth } from '../lib/firebase/auth'
+import { getPasswordResetErrorMessage } from '../lib/firebase/utils'
 import { Alert, AuthShell, Button, StatusIcon, TextField } from './ui'
 
 type Status = 'checking' | 'ready' | 'submitting' | 'success' | 'error'
 
 type ResetPasswordPageProps = {
   oobCode: string
-}
-
-function getResetErrorMessage(error: unknown): string {
-  if (!(error instanceof FirebaseError)) {
-    return 'Something went wrong. Please try again.'
-  }
-
-  switch (error.code) {
-    case 'auth/expired-action-code':
-      return 'This reset link has expired. Request a new one from the sign-in page.'
-    case 'auth/invalid-action-code':
-      return 'This reset link is invalid or has already been used.'
-    case 'auth/weak-password':
-      return 'Password should be at least 6 characters.'
-    case 'auth/password-does-not-meet-requirements': {
-      const match = error.message.match(/\[([^\]]+)\]/)
-      if (!match) {
-        return 'Password does not meet the requirements.'
-      }
-      const requirements = match[1]
-        .split(',')
-        .map((requirement) => requirement.trim().replace(/^Password\s+/i, ''))
-        .filter(Boolean)
-      if (requirements.length === 0) {
-        return 'Password does not meet the requirements.'
-      }
-      return `Password does not meet requirements:\n${requirements
-        .map((requirement) => `• ${requirement}`)
-        .join('\n')}`
-    }
-    default:
-      return error.message
-  }
 }
 
 export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
@@ -58,7 +21,7 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
 
     async function verifyCode() {
       try {
-        const accountEmail = await verifyPasswordResetCode(auth, oobCode)
+        const accountEmail = await auth.checkPasswordResetCode(oobCode)
         if (!cancelled) {
           setEmail(accountEmail)
           setStatus('ready')
@@ -66,7 +29,7 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
       } catch (err) {
         if (!cancelled) {
           setStatus('error')
-          setError(getResetErrorMessage(err))
+          setError(getPasswordResetErrorMessage(err))
         }
       }
     }
@@ -90,11 +53,11 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
     setStatus('submitting')
 
     try {
-      await confirmPasswordReset(auth, oobCode, password)
+      await auth.completePasswordReset(oobCode, password)
       setStatus('success')
     } catch (err) {
       setStatus('ready')
-      setError(getResetErrorMessage(err))
+      setError(getPasswordResetErrorMessage(err))
     }
   }
 

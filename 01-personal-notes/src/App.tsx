@@ -8,6 +8,7 @@ import { ResetPasswordPage } from './components/ResetPasswordPage'
 import { VerifyEmailPage } from './components/VerifyEmailPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { dummyNotes } from './data/dummy'
+import { auth } from './lib/firebase/auth'
 
 function getEmailActionParams() {
   const params = new URLSearchParams(window.location.search)
@@ -18,7 +19,7 @@ function getEmailActionParams() {
 }
 
 function AppShell() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('notes')
   const { mode, oobCode } = getEmailActionParams()
 
@@ -44,7 +45,7 @@ function AppShell() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         email={user.email ?? 'Signed in'}
-        onLogout={logout}
+        onLogout={auth.logout}
       />
 
       <main className="min-w-0 px-5 py-8 sm:px-10 sm:py-12 lg:px-14">

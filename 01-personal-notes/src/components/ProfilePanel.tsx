@@ -1,11 +1,26 @@
-import { useState, type ReactNode } from 'react'
-import type { User } from 'firebase/auth'
-import { useAuth } from '../context/AuthContext'
-import { Alert, Badge, Button, Card, PageHeader } from './ui'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import type { MultiFactorResolver, TotpSecret, User } from 'firebase/auth'
+import { toDataURL } from 'qrcode'
+import {
+  enrolledFactorCount,
+  findTotpFactor,
+  getMfaErrorMessage,
+  isMultiFactorError,
+  reauthProviderId,
+  type ReauthProviderId,
+} from '../lib/firebase/utils'
+import { auth } from '../lib/firebase/auth'
+import { Alert, Badge, Button, Card, GithubIcon, GoogleIcon, PageHeader, TextField } from './ui'
+import { cn } from './ui/cn'
 
 type ProfilePanelProps = {
   user: User
 }
+
+type MfaFlow =
+  | { mode: 'idle' }
+  | { mode: 'enable'; step: 'reauth' | 'device' }
+  | { mode: 'disable'; step: 'reauth' | 'code' }
 
 function ProfileRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -16,11 +31,142 @@ function ProfileRow({ label, children }: { label: string; children: ReactNode })
   )
 }
 
+function reauthPrompt(providerId: ReauthProviderId, purpose: 'enable' | 'disable') {
+  if (purpose === 'disable') {
+    if (providerId === 'password') {
+      return 'Enter your password to confirm it is you before turning off two-factor authentication.'
+    }
+    if (providerId === 'google.com') {
+      return 'Sign in with Google again to confirm it is you before turning off two-factor authentication.'
+    }
+    return 'Sign in with GitHub again to confirm it is you before turning off two-factor authentication.'
+  }
+
+  if (providerId === 'password') {
+    return 'Enter your password to confirm it is you. After this, you can add an authenticator app.'
+  }
+  if (providerId === 'google.com') {
+    return 'Sign in with Google again to confirm it is you. After this, you can add an authenticator app.'
+  }
+  return 'Sign in with GitHub again to confirm it is you. After this, you can add an authenticator app.'
+}
+
+function SetupSteps({ step }: { step: 'reauth' | 'device' }) {
+  const steps = [
+    { id: 'reauth', label: 'Confirm your identity' },
+    { id: 'device', label: 'Add authenticator' },
+  ] as const
+  const currentIndex = step === 'reauth' ? 0 : 1
+
+  return (
+    <ol className="grid gap-2 sm:grid-cols-2">
+      {steps.map((item, index) => {
+        const complete = index < currentIndex
+        const current = index === currentIndex
+        return (
+          <li
+            key={item.id}
+            aria-current={current ? 'step' : undefined}
+            className={cn(
+              'flex items-center gap-3 rounded-xl border px-3 py-2.5',
+              current ? 'border-accent/40 bg-accent-soft' : 'border-line bg-paper',
+            )}
+          >
+            <span
+              className={cn(
+                'flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                complete || current ? 'bg-accent text-white' : 'bg-line text-ink-soft',
+              )}
+            >
+              {complete ? '✓' : index + 1}
+            </span>
+            <span className={cn('text-[13px] font-semibold', current ? 'text-ink' : 'text-ink-soft')}>
+              {item.label}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function ReauthActions({
+  providerId,
+  password,
+  onPasswordChange,
+  working,
+  continueLabel,
+  workingLabel,
+  onContinue,
+  onCancel,
+}: {
+  providerId: ReauthProviderId
+  password: string
+  onPasswordChange: (value: string) => void
+  working: boolean
+  continueLabel: string
+  workingLabel: string
+  onContinue: () => void
+  onCancel: () => void
+}) {
+  if (providerId === 'password') {
+    return (
+      <form
+        className="grid gap-5"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onContinue()
+        }}
+      >
+        <TextField
+          label="Password"
+          required
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => onPasswordChange(event.target.value)}
+        />
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" loading={working} disabled={working}>
+            {working ? workingLabel : continueLabel}
+          </Button>
+          <Button variant="secondary" disabled={working} onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    )
+  }
+
+  const isGoogle = providerId === 'google.com'
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Button loading={working} disabled={working} onClick={onContinue}>
+        {isGoogle ? <GoogleIcon /> : <GithubIcon />}
+        {working ? workingLabel : isGoogle ? 'Sign in with Google' : 'Sign in with GitHub'}
+      </Button>
+      <Button variant="secondary" disabled={working} onClick={onCancel}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
 export function ProfilePanel({ user }: ProfilePanelProps) {
-  const { sendVerificationEmail } = useAuth()
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [flow, setFlow] = useState<MfaFlow>({ mode: 'idle' })
+  const [password, setPassword] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
+  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null)
+  const [working, setWorking] = useState(false)
+  const [providerId, setProviderId] = useState<ReauthProviderId | null>(null)
+  const [enrolledCount, setEnrolledCount] = useState(() => enrolledFactorCount(user))
 
   const createdAt = user.metadata.creationTime
     ? new Date(user.metadata.creationTime).toLocaleString()
@@ -28,6 +174,30 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   const lastSignIn = user.metadata.lastSignInTime
     ? new Date(user.metadata.lastSignInTime).toLocaleString()
     : 'Unknown'
+  const mfaEnabled = enrolledCount > 0
+
+  function resetFlow() {
+    setFlow({ mode: 'idle' })
+    setProviderId(null)
+    setPassword('')
+    setVerificationCode('')
+    setTotpSecret(null)
+    setQrDataUrl('')
+    setMfaResolver(null)
+  }
+
+  async function readReauthProvider() {
+    const result = await user.getIdTokenResult()
+    return reauthProviderId(user, result.signInProvider)
+  }
+
+  async function requireCurrentUser() {
+    const currentUser = auth.getCurrentUser()
+    if (!currentUser) {
+      throw new Error('No signed-in user.')
+    }
+    return currentUser
+  }
 
   async function handleSendVerification() {
     setMessage('')
@@ -35,7 +205,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setSending(true)
 
     try {
-      await sendVerificationEmail()
+      await auth.sendVerificationEmail()
       setMessage('Verification email sent. Check your inbox.')
     } catch (err) {
       setError(
@@ -43,6 +213,179 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
       )
     } finally {
       setSending(false)
+    }
+  }
+
+  async function startEnable() {
+    setMessage('')
+    setError('')
+
+    if (!user.emailVerified) {
+      setError('Verify your email before enabling two-factor authentication.')
+      return
+    }
+
+    setWorking(true)
+    try {
+      const nextProvider = await readReauthProvider()
+      if (!nextProvider) {
+        setError('Sign in with email, Google, or GitHub to enable two-factor authentication.')
+        return
+      }
+
+      setPassword('')
+      setProviderId(nextProvider)
+      setFlow({ mode: 'enable', step: 'reauth' })
+    } catch (err) {
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function startDisable() {
+    setMessage('')
+    setError('')
+    setWorking(true)
+
+    try {
+      const nextProvider = await readReauthProvider()
+      if (!nextProvider) {
+        setError('Sign in with email, Google, or GitHub to turn off two-factor authentication.')
+        return
+      }
+
+      setPassword('')
+      setVerificationCode('')
+      setMfaResolver(null)
+      setProviderId(nextProvider)
+      setFlow({ mode: 'disable', step: 'reauth' })
+    } catch (err) {
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function handleEnableReauth() {
+    if (!providerId) {
+      setError('Sign in with email, Google, or GitHub to enable two-factor authentication.')
+      return
+    }
+
+    setMessage('')
+    setError('')
+    setWorking(true)
+
+    try {
+      await auth.reauthenticate(user, providerId, password)
+      const sessionUser = await requireCurrentUser()
+      const secret = await auth.beginTotpEnrollment(sessionUser)
+      const qrUrl = await toDataURL(
+        secret.generateQrCodeUrl(sessionUser.email ?? sessionUser.uid, 'AI Notetaker'),
+        { margin: 1, width: 196 },
+      )
+
+      setTotpSecret(secret)
+      setQrDataUrl(qrUrl)
+      setVerificationCode('')
+      setPassword('')
+      setFlow({ mode: 'enable', step: 'device' })
+    } catch (err) {
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function handleDisableReauth() {
+    if (!providerId) {
+      setError('Sign in with email, Google, or GitHub to turn off two-factor authentication.')
+      return
+    }
+
+    setMessage('')
+    setError('')
+    setWorking(true)
+
+    try {
+      await auth.reauthenticate(user, providerId, password)
+      const currentUser = await requireCurrentUser()
+      setEnrolledCount(await auth.unenrollAllFactors(currentUser))
+      resetFlow()
+      setMessage('Two-factor authentication is off.')
+    } catch (err) {
+      if (isMultiFactorError(err)) {
+        setMfaResolver(auth.resolverFromError(err))
+        setVerificationCode('')
+        setPassword('')
+        setFlow({ mode: 'disable', step: 'code' })
+        return
+      }
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function handleDisableCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!mfaResolver || !findTotpFactor(mfaResolver.hints)) {
+      setError('This account uses a second factor this app cannot complete.')
+      return
+    }
+
+    setMessage('')
+    setError('')
+    setWorking(true)
+
+    try {
+      await auth.resolveTotpSignIn(mfaResolver, verificationCode.trim())
+      const currentUser = await requireCurrentUser()
+      setEnrolledCount(await auth.unenrollAllFactors(currentUser))
+      resetFlow()
+      setMessage('Two-factor authentication is off.')
+    } catch (err) {
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function handleEnroll(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const currentUser = auth.getCurrentUser()
+    if (!currentUser || !totpSecret) {
+      setError('Start authenticator setup again.')
+      return
+    }
+
+    setMessage('')
+    setError('')
+    setWorking(true)
+
+    try {
+      setEnrolledCount(await auth.enrollTotp(currentUser, totpSecret, verificationCode.trim()))
+      resetFlow()
+      setMessage(
+        'Two-factor authentication is on. You will be asked for a code the next time you sign in.',
+      )
+    } catch (err) {
+      setError(getMfaErrorMessage(err))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function copySecret() {
+    if (!totpSecret) return
+
+    try {
+      await navigator.clipboard.writeText(totpSecret.secretKey)
+      setMessage('Setup key copied.')
+      setError('')
+    } catch {
+      setError('Could not copy the setup key. Select it and copy it manually.')
     }
   }
 
@@ -81,10 +424,151 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
               ) : null}
             </span>
           </ProfileRow>
+          <ProfileRow label="Two-factor authentication">
+            <span className="flex flex-wrap items-center gap-3">
+              <Badge tone={mfaEnabled ? 'success' : 'warning'}>
+                {mfaEnabled ? 'Enabled' : 'Not enabled'}
+              </Badge>
+              {flow.mode === 'idle' ? (
+                mfaEnabled ? (
+                  <Button variant="secondary" size="sm" disabled={working} onClick={startDisable}>
+                    Disable
+                  </Button>
+                ) : user.emailVerified ? (
+                  <Button variant="secondary" size="sm" disabled={working} onClick={startEnable}>
+                    Enable
+                  </Button>
+                ) : (
+                  <span className="text-[13px] text-muted">Verify your email to enable this.</span>
+                )
+              ) : null}
+            </span>
+          </ProfileRow>
           <ProfileRow label="Account created">{createdAt}</ProfileRow>
           <ProfileRow label="Last sign-in">{lastSignIn}</ProfileRow>
         </dl>
       </Card>
+
+      {flow.mode === 'enable' && providerId ? (
+        <Card className="grid gap-5 p-6">
+          <div className="grid gap-1.5">
+            <h2 className="text-xl">Enable two-factor authentication</h2>
+            <p className="text-sm leading-6 text-ink-soft">
+              {flow.step === 'reauth'
+                ? reauthPrompt(providerId, 'enable')
+                : 'Scan the QR code with your authenticator app, or enter the setup key manually. Then enter the 6-digit code the app shows.'}
+            </p>
+          </div>
+          <SetupSteps step={flow.step} />
+          {flow.step === 'reauth' ? (
+            <ReauthActions
+              providerId={providerId}
+              password={password}
+              onPasswordChange={setPassword}
+              working={working}
+              continueLabel="Continue"
+              workingLabel="Confirming…"
+              onContinue={() => void handleEnableReauth()}
+              onCancel={resetFlow}
+            />
+          ) : totpSecret ? (
+            <>
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="Authenticator setup QR code"
+                  className="size-48 rounded-xl border border-line bg-white p-2"
+                />
+              ) : null}
+              <div className="grid gap-2">
+                <p className="text-[13px] font-semibold text-ink">Setup key</p>
+                <p className="font-mono text-[13px] break-all text-ink-soft">{totpSecret.secretKey}</p>
+                <div>
+                  <Button variant="secondary" size="sm" onClick={() => void copySecret()}>
+                    Copy key
+                  </Button>
+                </div>
+              </div>
+              <form className="grid gap-5" onSubmit={handleEnroll}>
+                <TextField
+                  label="Authenticator code"
+                  required
+                  name="otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  minLength={6}
+                  maxLength={6}
+                  placeholder="123456"
+                  value={verificationCode}
+                  onChange={(event) =>
+                    setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                  }
+                />
+                <div className="flex flex-wrap gap-3">
+                  <Button type="submit" loading={working} disabled={working}>
+                    {working ? 'Enabling…' : 'Enable two-factor authentication'}
+                  </Button>
+                  <Button variant="secondary" disabled={working} onClick={resetFlow}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {flow.mode === 'disable' && providerId ? (
+        <Card className="grid gap-5 p-6">
+          <div className="grid gap-1.5">
+            <h2 className="text-xl">Turn off two-factor authentication</h2>
+            <p className="text-sm leading-6 text-ink-soft">
+              {flow.step === 'code'
+                ? 'Enter the code from your authenticator app to confirm it is you.'
+                : reauthPrompt(providerId, 'disable')}
+            </p>
+          </div>
+          {flow.step === 'reauth' ? (
+            <ReauthActions
+              providerId={providerId}
+              password={password}
+              onPasswordChange={setPassword}
+              working={working}
+              continueLabel="Continue"
+              workingLabel="Confirming…"
+              onContinue={() => void handleDisableReauth()}
+              onCancel={resetFlow}
+            />
+          ) : (
+            <form className="grid gap-5" onSubmit={handleDisableCode}>
+              <TextField
+                label="Authenticator code"
+                required
+                name="otp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                minLength={6}
+                maxLength={6}
+                placeholder="123456"
+                value={verificationCode}
+                onChange={(event) =>
+                  setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                }
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button type="submit" loading={working} disabled={working}>
+                  {working ? 'Turning off…' : 'Turn off'}
+                </Button>
+                <Button variant="secondary" disabled={working} onClick={resetFlow}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      ) : null}
     </div>
   )
 }

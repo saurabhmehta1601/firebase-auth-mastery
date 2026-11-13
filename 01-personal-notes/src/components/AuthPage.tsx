@@ -1,72 +1,45 @@
 import { useState, type FormEvent } from 'react'
-import { FirebaseError } from 'firebase/app'
-import { useAuth } from '../context/AuthContext'
-import { AuthForm, type AuthMode } from './ui'
-
-function formatPasswordRequirementsError(message: string): string {
-  const match = message.match(/\[([^\]]+)\]/)
-  if (!match) {
-    return 'Password does not meet the requirements.'
-  }
-
-  const requirements = match[1]
-    .split(',')
-    .map((requirement) => requirement.trim().replace(/^Password\s+/i, ''))
-    .filter(Boolean)
-
-  if (requirements.length === 0) {
-    return 'Password does not meet the requirements.'
-  }
-
-  return `Password does not meet requirements:\n${requirements
-    .map((requirement) => `• ${requirement}`)
-    .join('\n')}`
-}
-
-function getErrorMessage(error: unknown): string {
-  if (!(error instanceof FirebaseError)) {
-    return 'Something went wrong. Please try again.'
-  }
-
-  switch (error.code) {
-    case 'auth/email-already-in-use':
-      return 'An account with this email already exists.'
-    case 'auth/invalid-email':
-      return 'Enter a valid email address.'
-    case 'auth/weak-password':
-      return 'Password should be at least 6 characters.'
-    case 'auth/password-does-not-meet-requirements':
-      return formatPasswordRequirementsError(error.message)
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Incorrect email or password.'
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait and try again.'
-    case 'auth/user-disabled':
-      return 'Account temporarily disabled.'
-    case 'auth/popup-closed-by-user':
-      return 'Sign-in was cancelled.'
-    case 'auth/popup-blocked':
-      return 'Pop-up was blocked. Allow pop-ups and try again.'
-    case 'auth/account-exists-with-different-credential':
-      return 'An account already exists with this email using a different sign-in method.'
-    case 'auth/operation-not-allowed':
-      return 'This sign-in provider is not enabled yet.'
-    default:
-      return error.message
-  }
-}
+import type { MultiFactorResolver } from 'firebase/auth'
+import { auth } from '../lib/firebase/auth'
+import { findTotpFactor, getSignInErrorMessage, isMultiFactorError } from '../lib/firebase/utils'
+import {
+  Alert,
+  ArrowLeftIcon,
+  AuthForm,
+  AuthShell,
+  Button,
+  LinkButton,
+  TextField,
+  type AuthMode,
+} from './ui'
 
 export function AuthPage() {
-  const { login, register, loginWithGoogle, loginWithGithub, sendPasswordReset } =
-    useAuth()
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+
+  function beginMfa(err: unknown) {
+    if (!isMultiFactorError(err)) {
+      return false
+    }
+
+    setMfaResolver(auth.resolverFromError(err))
+    setMfaCode('')
+    setError('')
+    setSuccess('')
+    return true
+  }
+
+  function cancelMfa() {
+    setMfaResolver(null)
+    setMfaCode('')
+    setError('')
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -76,17 +49,19 @@ export function AuthPage() {
 
     try {
       if (mode === 'forgot-password') {
-        await sendPasswordReset(email.trim())
+        await auth.sendPasswordReset(email.trim())
         setSuccess(
           'If an account exists for that email, a password reset link has been sent.',
         )
       } else if (mode === 'login') {
-        await login(email.trim(), password)
+        await auth.login(email.trim(), password)
       } else {
-        await register(email.trim(), password)
+        await auth.register(email.trim(), password)
       }
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (!beginMfa(err)) {
+        setError(getSignInErrorMessage(err))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -98,9 +73,11 @@ export function AuthPage() {
     setSubmitting(true)
 
     try {
-      await loginWithGoogle()
+      await auth.loginWithGoogle()
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (!beginMfa(err)) {
+        setError(getSignInErrorMessage(err))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -112,12 +89,92 @@ export function AuthPage() {
     setSubmitting(true)
 
     try {
-      await loginWithGithub()
+      await auth.loginWithGithub()
     } catch (err) {
-      setError(getErrorMessage(err))
+      if (!beginMfa(err)) {
+        setError(getSignInErrorMessage(err))
+      }
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!mfaResolver) return
+
+    const hint = findTotpFactor(mfaResolver.hints)
+    if (!hint) return
+
+    setError('')
+    setSubmitting(true)
+
+    try {
+      await auth.resolveTotpSignIn(mfaResolver, mfaCode.trim())
+    } catch (err) {
+      setError(getSignInErrorMessage(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (mfaResolver) {
+    const totpHint = findTotpFactor(mfaResolver.hints)
+
+    return (
+      <AuthShell>
+        <div className="grid gap-2 text-center">
+          <h1 className="text-[28px] leading-tight">Authenticator code</h1>
+          <p className="text-sm leading-6 text-ink-soft">
+            Enter the code from {totpHint?.displayName || 'your authenticator app'}.
+          </p>
+        </div>
+
+        <form className="mt-8 grid gap-5" onSubmit={handleMfaSubmit}>
+          {error ? <Alert status="danger">{error}</Alert> : null}
+
+          {totpHint ? (
+            <>
+              <TextField
+                label="Authenticator code"
+                required
+                name="otp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                minLength={6}
+                maxLength={6}
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(event) =>
+                  setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                }
+              />
+              <Button
+                type="submit"
+                size="lg"
+                fullWidth
+                loading={submitting}
+                disabled={submitting || mfaCode.length !== 6}
+              >
+                {submitting ? 'Verifying…' : 'Verify and sign in'}
+              </Button>
+            </>
+          ) : (
+            <Alert status="danger">
+              This account uses a second factor this app cannot complete.
+            </Alert>
+          )}
+        </form>
+
+        <div className="mt-8 flex justify-center border-t border-line pt-6">
+          <LinkButton onClick={cancelMfa}>
+            <ArrowLeftIcon />
+            Back to sign in
+          </LinkButton>
+        </div>
+      </AuthShell>
+    )
   }
 
   return (
