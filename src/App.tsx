@@ -7,7 +7,6 @@ import { Sidebar, type Tab } from './components/Sidebar'
 import { ResetPasswordPage } from './components/ResetPasswordPage'
 import { VerifyEmailPage } from './components/VerifyEmailPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { dummyNotes } from './data/dummy'
 import { auth } from './lib/firebase/auth'
 
 function getEmailActionParams() {
@@ -48,11 +47,7 @@ function AppShell() {
       />
 
       <main className="min-w-0 px-5 py-8 sm:px-10 sm:py-12 lg:px-14">
-        {activeTab === 'notes' ? (
-          <NotesPanel notes={dummyNotes} />
-        ) : (
-          <ProfilePanel user={user} />
-        )}
+        {activeTab === 'notes' ? <NotesPanel /> : <ProfilePanel user={user} />}
       </main>
     </div>
   )

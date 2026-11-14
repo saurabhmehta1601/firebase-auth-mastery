@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users/{userId}/notes/{noteId}
+    // Document ID: auto-generated or client-chosen string
+    // Fields:
+    //   - title: string (required, 1–200 chars)
+    //   - content: string (required, 0–50_000 chars)
+    //   - createdAt: timestamp (required, immutable, must be recent on create)
+    //   - updatedAt: timestamp (required, must be recent on create/update)
+    //
+    // Access: authenticated owner only (path-scoped to request.auth.uid).
+    // Owner may create, read, update, and delete their own notes.
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isRecent(time) {
+      return time is timestamp
+        && time > request.time - duration.value(5, 'm')
+        && time <= request.time;
+    }
+
+    function isValidNote(data) {
+      return hasRequiredFields(['title', 'content', 'createdAt', 'updatedAt'])
+        && hasOnlyAllowedFields(['title', 'content', 'createdAt', 'updatedAt'])
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 200
+        && data.content is string
+        && data.content.size() <= 50000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/notes/{noteId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && isValidNote(request.resource.data)
+        && isRecent(request.resource.data.createdAt)
+        && isRecent(request.resource.data.updatedAt)
+        && request.resource.data.updatedAt == request.resource.data.createdAt;
+
+      allow update: if isOwner(userId)
+        && isValidNote(request.resource.data)
+        && areImmutableFieldsUnchanged(['createdAt'])
+        && isRecent(request.resource.data.updatedAt);
+
+      allow delete: if isOwner(userId);
+    }
+  }
+}
