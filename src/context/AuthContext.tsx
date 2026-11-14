@@ -5,22 +5,21 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { onAuthStateChanged, type User } from 'firebase/auth'
-import { auth } from '../lib/firebase/firebase'
+import { auth, type AuthUser } from '../lib/firebase/auth'
 
 type AuthContextValue = {
-  user: User | null
+  user: AuthUser | null
   loading: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (nextUser) => {
+    return auth.subscribe((nextUser) => {
       setUser(nextUser)
       setLoading(false)
     })

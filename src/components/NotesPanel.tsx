@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { Note } from '../data/dummy'
 import { useAuth } from '../context/AuthContext'
 import { auth } from '../lib/firebase/auth'
-import { isEmailPasswordUser } from '../lib/firebase/utils'
 import { Alert, Button, Card, NotesIcon, PageHeader } from './ui'
 
 type NotesPanelProps = {
@@ -17,7 +16,7 @@ export function NotesPanel({ notes }: NotesPanelProps) {
   const [error, setError] = useState('')
 
   const showVerifyAlert =
-    !!user && isEmailPasswordUser(user) && !user.emailVerified && !dismissed
+    !!user && user.hasPasswordProvider && !user.emailVerified && !dismissed
 
   async function handleVerifyNow() {
     setMessage('')

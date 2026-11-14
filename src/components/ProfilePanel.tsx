@@ -1,18 +1,11 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import type { MultiFactorResolver, TotpSecret, User } from 'firebase/auth'
 import { toDataURL } from 'qrcode'
 import {
-  enrolledFactorCount,
-  findTotpFactor,
-  getLinkErrorMessage,
-  getMfaErrorMessage,
-  isMultiFactorError,
-  linkedProviderIds,
-  reauthProviderId,
+  auth,
+  type AuthUser,
   type LinkableProviderId,
   type ReauthProviderId,
-} from '../lib/firebase/utils'
-import { auth } from '../lib/firebase/auth'
+} from '../lib/firebase/auth'
 import { Alert, Badge, Button, Card, GithubIcon, GoogleIcon, PageHeader, TextField } from './ui'
 import { cn } from './ui/cn'
 
@@ -27,7 +20,7 @@ const LINKABLE_PROVIDERS: {
 ]
 
 type ProfilePanelProps = {
-  user: User
+  user: AuthUser
 }
 
 type MfaFlow =
@@ -192,41 +185,28 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
   const [flow, setFlow] = useState<MfaFlow>({ mode: 'idle' })
   const [password, setPassword] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
-  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null)
+  const [totpSecretKey, setTotpSecretKey] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
-  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null)
   const [working, setWorking] = useState(false)
   const [linkingProvider, setLinkingProvider] = useState<LinkableProviderId | null>(null)
   const [providerId, setProviderId] = useState<ReauthProviderId | null>(null)
-  const [enrolledCount, setEnrolledCount] = useState(() => enrolledFactorCount(user))
-  const [providers, setProviders] = useState(() => linkedProviderIds(user))
+  const [enrolledCount, setEnrolledCount] = useState(() => user.enrolledFactorCount)
+  const [providers, setProviders] = useState(() => user.providers)
 
-  const createdAt = formatProfileDateTime(user.metadata.creationTime)
-  const lastSignIn = formatProfileDateTime(user.metadata.lastSignInTime)
+  const createdAt = formatProfileDateTime(user.createdAt)
+  const lastSignIn = formatProfileDateTime(user.lastSignInAt)
   const mfaEnabled = enrolledCount > 0
   const passwordLinked = providers.includes('password')
 
   function resetFlow() {
+    auth.cancelMfaChallenge()
+    auth.cancelTotpSetup()
     setFlow({ mode: 'idle' })
     setProviderId(null)
     setPassword('')
     setVerificationCode('')
-    setTotpSecret(null)
+    setTotpSecretKey('')
     setQrDataUrl('')
-    setMfaResolver(null)
-  }
-
-  async function readReauthProvider() {
-    const result = await user.getIdTokenResult()
-    return reauthProviderId(user, result.signInProvider)
-  }
-
-  async function requireCurrentUser() {
-    const currentUser = auth.getCurrentUser()
-    if (!currentUser) {
-      throw new Error('No signed-in user.')
-    }
-    return currentUser
   }
 
   async function handleSendVerification() {
@@ -257,7 +237,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
 
     setWorking(true)
     try {
-      const nextProvider = await readReauthProvider()
+      const nextProvider = await auth.getReauthProvider()
       if (!nextProvider) {
         setError('Sign in with email, Google, or GitHub to enable two-factor authentication.')
         return
@@ -267,7 +247,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
       setProviderId(nextProvider)
       setFlow({ mode: 'enable', step: 'reauth' })
     } catch (err) {
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
@@ -279,7 +259,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setWorking(true)
 
     try {
-      const nextProvider = await readReauthProvider()
+      const nextProvider = await auth.getReauthProvider()
       if (!nextProvider) {
         setError('Sign in with email, Google, or GitHub to turn off two-factor authentication.')
         return
@@ -287,11 +267,10 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
 
       setPassword('')
       setVerificationCode('')
-      setMfaResolver(null)
       setProviderId(nextProvider)
       setFlow({ mode: 'disable', step: 'reauth' })
     } catch (err) {
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
@@ -308,21 +287,17 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setWorking(true)
 
     try {
-      await auth.reauthenticate(user, providerId, password)
-      const sessionUser = await requireCurrentUser()
-      const secret = await auth.beginTotpEnrollment(sessionUser)
-      const qrUrl = await toDataURL(
-        secret.generateQrCodeUrl(sessionUser.email ?? sessionUser.uid, 'AI Notetaker'),
-        { margin: 1, width: 196 },
-      )
+      await auth.reauthenticate(providerId, password)
+      const setup = await auth.beginTotpSetup('AI Notetaker')
+      const qrUrl = await toDataURL(setup.otpauthUrl, { margin: 1, width: 196 })
 
-      setTotpSecret(secret)
+      setTotpSecretKey(setup.secretKey)
       setQrDataUrl(qrUrl)
       setVerificationCode('')
       setPassword('')
       setFlow({ mode: 'enable', step: 'device' })
     } catch (err) {
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
@@ -339,20 +314,19 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setWorking(true)
 
     try {
-      await auth.reauthenticate(user, providerId, password)
-      const currentUser = await requireCurrentUser()
-      setEnrolledCount(await auth.unenrollAllFactors(currentUser))
+      await auth.reauthenticate(providerId, password)
+      const nextUser = await auth.unenrollAllFactors()
+      setEnrolledCount(nextUser.enrolledFactorCount)
       resetFlow()
       setMessage('Two-factor authentication is off.')
     } catch (err) {
-      if (isMultiFactorError(err)) {
-        setMfaResolver(auth.resolverFromError(err))
+      if (auth.captureMfaChallenge(err)) {
         setVerificationCode('')
         setPassword('')
         setFlow({ mode: 'disable', step: 'code' })
         return
       }
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
@@ -360,7 +334,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
 
   async function handleDisableCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!mfaResolver || !findTotpFactor(mfaResolver.hints)) {
+    if (!auth.hasTotpMfaChallenge()) {
       setError('This account uses a second factor this app cannot complete.')
       return
     }
@@ -370,13 +344,13 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setWorking(true)
 
     try {
-      await auth.resolveTotpSignIn(mfaResolver, verificationCode.trim())
-      const currentUser = await requireCurrentUser()
-      setEnrolledCount(await auth.unenrollAllFactors(currentUser))
+      await auth.completeMfaChallenge(verificationCode.trim())
+      const nextUser = await auth.unenrollAllFactors()
+      setEnrolledCount(nextUser.enrolledFactorCount)
       resetFlow()
       setMessage('Two-factor authentication is off.')
     } catch (err) {
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
@@ -384,8 +358,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
 
   async function handleEnroll(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const currentUser = auth.getCurrentUser()
-    if (!currentUser || !totpSecret) {
+    if (!totpSecretKey) {
       setError('Start authenticator setup again.')
       return
     }
@@ -395,23 +368,24 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setWorking(true)
 
     try {
-      setEnrolledCount(await auth.enrollTotp(currentUser, totpSecret, verificationCode.trim()))
+      const nextUser = await auth.enrollTotp(verificationCode.trim())
+      setEnrolledCount(nextUser.enrolledFactorCount)
       resetFlow()
       setMessage(
         'Two-factor authentication is on. You will be asked for a code the next time you sign in.',
       )
     } catch (err) {
-      setError(getMfaErrorMessage(err))
+      setError(auth.getMfaErrorMessage(err))
     } finally {
       setWorking(false)
     }
   }
 
   async function copySecret() {
-    if (!totpSecret) return
+    if (!totpSecretKey) return
 
     try {
-      await navigator.clipboard.writeText(totpSecret.secretKey)
+      await navigator.clipboard.writeText(totpSecretKey)
       setMessage('Setup key copied.')
       setError('')
     } catch {
@@ -425,21 +399,15 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
     setLinkingProvider(provider)
 
     try {
-      if (provider === 'google.com') {
-        await auth.linkWithGoogle(user)
-      } else {
-        await auth.linkWithGithub(user)
-      }
-
-      const currentUser = await requireCurrentUser()
-      setProviders(linkedProviderIds(currentUser))
+      const nextUser = await auth.linkProvider(provider)
+      setProviders(nextUser.providers)
       setMessage(
         provider === 'google.com'
           ? 'Google is linked. You can sign in with Google next time.'
           : 'GitHub is linked. You can sign in with GitHub next time.',
       )
     } catch (err) {
-      setError(getLinkErrorMessage(err))
+      setError(auth.getLinkErrorMessage(err))
     } finally {
       setLinkingProvider(null)
     }
@@ -581,7 +549,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
                 onContinue={() => void handleEnableReauth()}
                 onCancel={resetFlow}
               />
-            ) : totpSecret ? (
+            ) : totpSecretKey ? (
               <>
                 {qrDataUrl ? (
                   <img
@@ -592,7 +560,7 @@ export function ProfilePanel({ user }: ProfilePanelProps) {
                 ) : null}
                 <div className="grid gap-2">
                   <p className="text-[13px] font-semibold text-ink">Setup key</p>
-                  <p className="font-mono text-[13px] break-all text-ink-soft">{totpSecret.secretKey}</p>
+                  <p className="font-mono text-[13px] break-all text-ink-soft">{totpSecretKey}</p>
                   <div>
                     <Button variant="secondary" size="sm" onClick={() => void copySecret()}>
                       Copy key

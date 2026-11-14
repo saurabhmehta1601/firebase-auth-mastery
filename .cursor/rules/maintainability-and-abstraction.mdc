@@ -1,0 +1,30 @@
+---
+description: Prefer readable, newcomer-friendly code; abstract only to reduce coupling and change amplification
+alwaysApply: true
+---
+
+# Maintainability and abstraction
+
+This is a solo-maintained codebase. Optimize for clarity and easy change, not for enterprise layering.
+
+## Readability first
+
+- Write code that a newcomer can follow without tribal knowledge.
+- Prefer clear names, straightforward control flow, and colocated logic over clever indirection.
+- Keep modules small enough to understand in one sitting; avoid deep call chains that hide what actually happens.
+
+## Prefer fewer abstractions
+
+- Do **not** introduce wrappers, interfaces, factories, or “flexible” layers that add little value for a single developer.
+- Do **not** abstract “just in case.” Wait until a second real use case or a clear coupling problem appears.
+- Inline or delete abstractions that only forward calls or rename concepts without simplifying change.
+
+## Abstract to reduce coupling and change amplification
+
+- **Do** extract a boundary when one change otherwise forces edits across many unrelated places (change amplification).
+- **Do** separate concerns that change for different reasons (e.g. auth wiring vs UI, Firebase SDK details vs app logic).
+- Prefer a small, obvious seam (one module or function) over a hierarchy of types and indirections.
+
+## Decision test
+
+Before adding an abstraction, ask: *Does this make the next change easier and the code clearer for a newcomer?* If not, keep it concrete and local.

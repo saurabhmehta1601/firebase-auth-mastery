@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { auth } from '../lib/firebase/auth'
-import { getPasswordResetErrorMessage } from '../lib/firebase/utils'
 import { Alert, AuthShell, Button, StatusIcon, TextField } from './ui'
 
 type Status = 'checking' | 'ready' | 'submitting' | 'success' | 'error'
@@ -29,7 +28,7 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
       } catch (err) {
         if (!cancelled) {
           setStatus('error')
-          setError(getPasswordResetErrorMessage(err))
+          setError(auth.getPasswordResetErrorMessage(err))
         }
       }
     }
@@ -57,7 +56,7 @@ export function ResetPasswordPage({ oobCode }: ResetPasswordPageProps) {
       setStatus('success')
     } catch (err) {
       setStatus('ready')
-      setError(getPasswordResetErrorMessage(err))
+      setError(auth.getPasswordResetErrorMessage(err))
     }
   }
 

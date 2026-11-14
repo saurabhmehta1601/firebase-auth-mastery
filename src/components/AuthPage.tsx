@@ -1,7 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { MultiFactorResolver } from 'firebase/auth'
 import { auth } from '../lib/firebase/auth'
-import { findTotpFactor, getSignInErrorMessage, isMultiFactorError } from '../lib/firebase/utils'
 import {
   Alert,
   ArrowLeftIcon,
@@ -20,15 +18,15 @@ export function AuthPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null)
+  const [mfaStep, setMfaStep] = useState(false)
   const [mfaCode, setMfaCode] = useState('')
 
   function beginMfa(err: unknown) {
-    if (!isMultiFactorError(err)) {
+    if (!auth.captureMfaChallenge(err)) {
       return false
     }
 
-    setMfaResolver(auth.resolverFromError(err))
+    setMfaStep(true)
     setMfaCode('')
     setError('')
     setSuccess('')
@@ -36,7 +34,8 @@ export function AuthPage() {
   }
 
   function cancelMfa() {
-    setMfaResolver(null)
+    auth.cancelMfaChallenge()
+    setMfaStep(false)
     setMfaCode('')
     setError('')
   }
@@ -60,7 +59,7 @@ export function AuthPage() {
       }
     } catch (err) {
       if (!beginMfa(err)) {
-        setError(getSignInErrorMessage(err))
+        setError(auth.getSignInErrorMessage(err))
       }
     } finally {
       setSubmitting(false)
@@ -76,7 +75,7 @@ export function AuthPage() {
       await auth.loginWithGoogle()
     } catch (err) {
       if (!beginMfa(err)) {
-        setError(getSignInErrorMessage(err))
+        setError(auth.getSignInErrorMessage(err))
       }
     } finally {
       setSubmitting(false)
@@ -92,7 +91,7 @@ export function AuthPage() {
       await auth.loginWithGithub()
     } catch (err) {
       if (!beginMfa(err)) {
-        setError(getSignInErrorMessage(err))
+        setError(auth.getSignInErrorMessage(err))
       }
     } finally {
       setSubmitting(false)
@@ -101,39 +100,38 @@ export function AuthPage() {
 
   async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!mfaResolver) return
-
-    const hint = findTotpFactor(mfaResolver.hints)
-    if (!hint) return
+    if (!auth.hasTotpMfaChallenge()) return
 
     setError('')
     setSubmitting(true)
 
     try {
-      await auth.resolveTotpSignIn(mfaResolver, mfaCode.trim())
+      await auth.completeMfaChallenge(mfaCode.trim())
+      setMfaStep(false)
     } catch (err) {
-      setError(getSignInErrorMessage(err))
+      setError(auth.getSignInErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (mfaResolver) {
-    const totpHint = findTotpFactor(mfaResolver.hints)
+  if (mfaStep) {
+    const totpReady = auth.hasTotpMfaChallenge()
+    const hintLabel = auth.mfaChallengeLabel()
 
     return (
       <AuthShell>
         <div className="grid gap-2 text-center">
           <h1 className="text-[28px] leading-tight">Authenticator code</h1>
           <p className="text-sm leading-6 text-ink-soft">
-            Enter the code from {totpHint?.displayName || 'your authenticator app'}.
+            Enter the code from {hintLabel || 'your authenticator app'}.
           </p>
         </div>
 
         <form className="mt-8 grid gap-5" onSubmit={handleMfaSubmit}>
           {error ? <Alert status="danger">{error}</Alert> : null}
 
-          {totpHint ? (
+          {totpReady ? (
             <>
               <TextField
                 label="Authenticator code"

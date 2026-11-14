@@ -9,6 +9,7 @@ import {
   getMultiFactorResolver,
   linkWithPopup,
   multiFactor,
+  onAuthStateChanged,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   sendEmailVerification,
@@ -17,19 +18,88 @@ import {
   signInWithPopup,
   signOut,
   verifyPasswordResetCode,
-  type MultiFactorError,
   type MultiFactorResolver,
   type TotpSecret,
   type User,
 } from 'firebase/auth'
 import { auth as firebaseAuth } from './firebase'
-import type { ReauthProviderId } from './utils'
+import {
+  findTotpFactor,
+  getLinkErrorMessage,
+  getMfaErrorMessage,
+  getPasswordResetErrorMessage,
+  getSignInErrorMessage,
+  isMultiFactorError,
+  linkedProviderIds,
+  reauthProviderId,
+  type LinkableProviderId,
+  type ReauthProviderId,
+} from './utils'
+
+export type { LinkableProviderId, ReauthProviderId }
+export type AuthProviderId = ReauthProviderId
+
+/** App-facing signed-in user. UI should never need Firebase's User type. */
+export type AuthUser = {
+  uid: string
+  email: string | null
+  emailVerified: boolean
+  createdAt?: string
+  lastSignInAt?: string
+  providers: string[]
+  enrolledFactorCount: number
+  hasPasswordProvider: boolean
+}
+
+export type TotpSetup = {
+  secretKey: string
+  otpauthUrl: string
+}
+
+let pendingMfaResolver: MultiFactorResolver | null = null
+let pendingTotpSecret: TotpSecret | null = null
+
+function toAuthUser(user: User): AuthUser {
+  const providers = linkedProviderIds(user)
+  return {
+    uid: user.uid,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    createdAt: user.metadata.creationTime,
+    lastSignInAt: user.metadata.lastSignInTime,
+    providers,
+    enrolledFactorCount: multiFactor(user).enrolledFactors.length,
+    hasPasswordProvider: providers.includes('password'),
+  }
+}
+
+function requireFirebaseUser() {
+  const user = firebaseAuth.currentUser
+  if (!user) {
+    throw new Error('No signed-in user.')
+  }
+  return user
+}
 
 function actionCodeSettings(handleCodeInApp: boolean) {
   return {
     url: window.location.origin,
     handleCodeInApp,
   }
+}
+
+function clearMfaChallenge() {
+  pendingMfaResolver = null
+}
+
+function clearTotpSetup() {
+  pendingTotpSecret = null
+}
+
+function subscribe(onChange: (user: AuthUser | null) => void) {
+  return onAuthStateChanged(firebaseAuth, (user) => {
+    onChange(user ? toAuthUser(user) : null)
+  })
 }
 
 async function register(email: string, password: string) {
@@ -49,14 +119,13 @@ async function loginWithGithub() {
 }
 
 async function logout() {
+  clearMfaChallenge()
+  clearTotpSetup()
   await signOut(firebaseAuth)
 }
 
 async function sendVerificationEmail() {
-  if (!firebaseAuth.currentUser) {
-    throw new Error('No signed-in user to verify.')
-  }
-  await sendEmailVerification(firebaseAuth.currentUser, actionCodeSettings(false))
+  await sendEmailVerification(requireFirebaseUser(), actionCodeSettings(false))
 }
 
 async function sendPasswordReset(email: string) {
@@ -78,11 +147,15 @@ async function completePasswordReset(oobCode: string, password: string) {
   await confirmPasswordReset(firebaseAuth, oobCode, password)
 }
 
-function getCurrentUser() {
-  return firebaseAuth.currentUser
+async function getReauthProvider(): Promise<ReauthProviderId | null> {
+  const user = requireFirebaseUser()
+  const result = await user.getIdTokenResult()
+  return reauthProviderId(user, result.signInProvider)
 }
 
-async function reauthenticate(user: User, providerId: ReauthProviderId, password = '') {
+async function reauthenticate(providerId: ReauthProviderId, password = '') {
+  const user = requireFirebaseUser()
+
   if (providerId === 'password') {
     if (!user.email) {
       throw new Error('This account has no email address.')
@@ -100,53 +173,94 @@ async function reauthenticate(user: User, providerId: ReauthProviderId, password
   await reauthenticateWithPopup(user, new GithubAuthProvider())
 }
 
-async function linkWithGoogle(user: User) {
-  await linkWithPopup(user, new GoogleAuthProvider())
+async function linkProvider(provider: LinkableProviderId): Promise<AuthUser> {
+  const user = requireFirebaseUser()
+  if (provider === 'google.com') {
+    await linkWithPopup(user, new GoogleAuthProvider())
+  } else {
+    await linkWithPopup(user, new GithubAuthProvider())
+  }
   await user.reload()
+  return toAuthUser(user)
 }
 
-async function linkWithGithub(user: User) {
-  await linkWithPopup(user, new GithubAuthProvider())
-  await user.reload()
-}
-
-async function beginTotpEnrollment(user: User) {
+async function beginTotpSetup(appName: string): Promise<TotpSetup> {
+  const user = requireFirebaseUser()
   const session = await multiFactor(user).getSession()
-  return TotpMultiFactorGenerator.generateSecret(session)
+  const secret = await TotpMultiFactorGenerator.generateSecret(session)
+  pendingTotpSecret = secret
+  return {
+    secretKey: secret.secretKey,
+    otpauthUrl: secret.generateQrCodeUrl(user.email ?? user.uid, appName),
+  }
 }
 
-async function enrollTotp(user: User, secret: TotpSecret, code: string) {
-  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, code)
+async function enrollTotp(code: string): Promise<AuthUser> {
+  const user = requireFirebaseUser()
+  if (!pendingTotpSecret) {
+    throw new Error('Start authenticator setup again.')
+  }
+  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(
+    pendingTotpSecret,
+    code,
+  )
   await multiFactor(user).enroll(assertion, 'Authenticator')
   await user.reload()
-  return multiFactor(user).enrolledFactors.length
+  clearTotpSetup()
+  return toAuthUser(user)
 }
 
-async function unenrollAllFactors(user: User) {
+async function unenrollAllFactors(): Promise<AuthUser> {
+  const user = requireFirebaseUser()
   const factors = [...multiFactor(user).enrolledFactors]
   for (const factor of factors) {
     await multiFactor(user).unenroll(factor)
   }
   await user.reload()
-  return multiFactor(user).enrolledFactors.length
+  return toAuthUser(user)
 }
 
-function resolverFromError(error: MultiFactorError) {
-  return getMultiFactorResolver(firebaseAuth, error)
+/** Capture an MFA challenge from a sign-in/reauth error. Firebase resolver stays inside this module. */
+function captureMfaChallenge(error: unknown): boolean {
+  if (!isMultiFactorError(error)) {
+    return false
+  }
+  pendingMfaResolver = getMultiFactorResolver(firebaseAuth, error)
+  return true
 }
 
-async function resolveTotpSignIn(resolver: MultiFactorResolver, code: string) {
-  const hint = resolver.hints.find(
-    (factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID,
-  )
+function hasTotpMfaChallenge() {
+  return !!pendingMfaResolver && !!findTotpFactor(pendingMfaResolver.hints)
+}
+
+function mfaChallengeLabel() {
+  if (!pendingMfaResolver) return null
+  return findTotpFactor(pendingMfaResolver.hints)?.displayName ?? null
+}
+
+async function completeMfaChallenge(code: string) {
+  if (!pendingMfaResolver) {
+    throw new Error('No multi-factor challenge in progress.')
+  }
+  const hint = findTotpFactor(pendingMfaResolver.hints)
   if (!hint) {
     throw new Error('This account uses a second factor this app cannot complete.')
   }
   const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, code)
-  await resolver.resolveSignIn(assertion)
+  await pendingMfaResolver.resolveSignIn(assertion)
+  clearMfaChallenge()
+}
+
+function cancelMfaChallenge() {
+  clearMfaChallenge()
+}
+
+function cancelTotpSetup() {
+  clearTotpSetup()
 }
 
 export const auth = {
+  subscribe,
   register,
   login,
   loginWithGoogle,
@@ -157,13 +271,20 @@ export const auth = {
   applyEmailVerification,
   checkPasswordResetCode,
   completePasswordReset,
-  getCurrentUser,
+  getReauthProvider,
   reauthenticate,
-  linkWithGoogle,
-  linkWithGithub,
-  beginTotpEnrollment,
+  linkProvider,
+  beginTotpSetup,
   enrollTotp,
   unenrollAllFactors,
-  resolverFromError,
-  resolveTotpSignIn,
+  captureMfaChallenge,
+  hasTotpMfaChallenge,
+  mfaChallengeLabel,
+  completeMfaChallenge,
+  cancelMfaChallenge,
+  cancelTotpSetup,
+  getSignInErrorMessage,
+  getMfaErrorMessage,
+  getLinkErrorMessage,
+  getPasswordResetErrorMessage,
 }
