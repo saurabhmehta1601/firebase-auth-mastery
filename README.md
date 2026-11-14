@@ -1,18 +1,103 @@
-# Firebase Auth Mastery
+# Firebase Auth System
 
-A hands-on curriculum for learning **Firebase Authentication** and **Authorization** in React web apps — from first login form to production-ready access control.
+## Features
 
-This repository is a collection of progressive projects built with **React**, **TypeScript**, and the **Firebase Web SDK**. Each one builds on the last, so you can start at the beginning or jump to the level that matches where you are.
+### Authentication providers
 
----
+- Sign in with email and password
+- Sign up with email and password
+- Sign in with Google
+- Sign in with GitHub
 
-## Why this exists
+### Password recovery
 
-Most Firebase tutorials stop at “sign in with Google.” Real apps need more: protected routes, role-based access, secure session handling, and rules that keep data safe even when the client is compromised.
+- Forgot-password flow that sends a reset email
+- In-app password reset page (from the email link)
+- Clear validation for password requirements and confirmation matching
 
-This repo walks that path in small, focused React projects so you learn by building — not by reading another wall of docs.
+### Email verification
 
----
+- Send verification email from profile or from an in-app banner
+- Dedicated verify-email page that completes verification from the email link
+- Verified / not-verified status shown on the profile
+
+### Multi-factor authentication (MFA)
+
+- Enable TOTP (authenticator app) with QR code and manual setup key
+- MFA challenge on sign-in (email/password, Google, or GitHub)
+- Disable MFA with reauthentication (and authenticator code when required)
+- Email must be verified before MFA can be enabled
+
+### Account linking
+
+- Link Google to an existing account
+- Link GitHub to an existing account
+- Profile view of which sign-in methods are linked
+
+### Session and access control
+
+- Persistent auth state with a loading screen while the session is restored
+- Signed-out users see the auth screens; signed-in users enter the app
+- Sign out from the app sidebar
+- Email action links (reset password / verify email) work even when logged out
+
+### Profile
+
+- View email, verification status, account created time, and last sign-in
+- Manage linked providers and two-factor authentication from one place
+
+### Security and UX
+
+- Reauthentication before sensitive MFA changes
+- Friendly, user-facing error messages for common Firebase Auth failures
+- Loading and disabled states on auth and profile actions
+- Accessible form patterns (alerts, MFA step indicators, focus styles)
+
+## Architecture
+
+This system is built on **Firebase Authentication**. The React app talks to Firebase through the Web SDK; Firebase owns user identity, sessions, and the security settings below.
+
+### Sign-in providers
+
+Enabled and used in the app:
+
+| Provider | How it is used |
+| -------- | -------------- |
+| Email / password | Register, sign in, password reset |
+| Google | OAuth popup sign-in and account linking |
+| GitHub | OAuth popup sign-in and account linking |
+
+### Firebase Auth capabilities in use
+
+- **User accounts** — each signed-in user has a Firebase `uid`, email, verification status, and metadata (created / last sign-in)
+- **Email verification** — Firebase sends verification emails; the app completes them with action codes
+- **Password reset** — Firebase sends reset emails; the app verifies the code and sets a new password in-app
+- **Multi-factor authentication (TOTP)** — authenticator-app second factor, enrolled and challenged through Firebase MFA APIs
+- **Account linking** — Google / GitHub can be linked onto an existing user so one account supports multiple sign-in methods
+- **Reauthentication** — required before sensitive MFA changes
+- **Auth state** — `onAuthStateChanged` drives session restore, signed-in / signed-out routing, and sign-out
+
+### Password policy
+
+Firebase Auth password policy is enabled for email/password accounts. New passwords must satisfy the project’s strength rules, including:
+
+- At least one lowercase character
+- At least one uppercase character
+- At least one numeric character
+- At least one non-alphanumeric (special) character
+
+If a password fails the policy, Firebase returns `auth/password-does-not-meet-requirements`, and the app surfaces the missing requirements to the user.
+
+## Infrastructure Cost Estimation
+
+Most Firebase services used by this project sit inside the [Spark (free) plan](https://firebase.google.com/pricing) limits.
+
+| Service | Used for | Free-tier coverage |
+| ------- | -------- | ------------------ |
+| Firebase Authentication | Sign-in providers, email verification, password reset, MFA, account linking | Covered on the free plan for the current usage |
+| Firebase Hosting | Serving the web app | Covered on the free plan for the current usage |
+
+At the moment, this project does not use any Firebase product that requires a paid plan. Costs stay at **$0** while traffic and usage remain within free-tier quotas.
 
 ## Tech stack
 
@@ -26,97 +111,3 @@ This repo walks that path in small, focused React projects so you learn by build
 Every project in this repo follows this stack unless a project README says otherwise.
 
 ---
-
-## What you will learn
-
-- Email/password and social sign-in with the Firebase Web SDK
-- Auth state in React (`onAuthStateChanged`, context/hooks patterns)
-- Session persistence, sign-out, and typed user state
-- Protecting client routes and UI based on auth status
-- Custom claims and role-based authorization
-- Firestore Security Rules that enforce who can read and write
-- Patterns that keep secrets off the client and trust the server (or rules) instead
-
----
-
-## Learning path
-
-Projects are ordered from beginner to advanced. Complete them in sequence for the best experience.
-
-| Level | Project | Focus |
-| ----- | ------- | ----- |
-| 01 · Beginner | Email & password auth | Sign up, sign in, sign out, auth state |
-| 02 · Beginner | Social providers | Google (and other) OAuth sign-in |
-| 03 · Intermediate | Protected routes | Client-side guards and redirects |
-| 04 · Intermediate | User profiles | Storing profile data securely in Firestore |
-| 05 · Intermediate | Security Rules basics | Read/write rules tied to `request.auth` |
-| 06 · Advanced | Roles & custom claims | Admin vs member access patterns |
-| 07 · Advanced | Production auth patterns | Token refresh, error handling, hardening |
-
-> Project folders will land under this repo as they are added. Each project includes its own README with setup steps and learning goals.
-
----
-
-## Repository structure
-
-```text
-firebase-auth-mastery/
-├── README.md                 # You are here
-├── 01-email-password/        # Beginner
-├── 02-social-providers/      # Beginner
-├── 03-protected-routes/      # Intermediate
-├── 04-user-profiles/         # Intermediate
-├── 05-security-rules/        # Intermediate
-├── 06-roles-claims/          # Advanced
-└── 07-production-patterns/   # Advanced
-```
-
-Exact folder names may evolve; the numbering and difficulty order stay the same.
-
----
-
-## Prerequisites
-
-- Comfortable with React fundamentals (components, props, state, hooks)
-- Basic TypeScript (types, interfaces; generics help but are not required on day one)
-- Node.js installed locally
-- A free [Firebase](https://firebase.google.com/) project
-- Willingness to use the Firebase Console and (later) the Firebase CLI
-
-No prior Firebase experience is required for Project 01.
-
----
-
-## How to use this repo
-
-1. Clone the repository.
-2. Open the project folder for your current level.
-3. Follow that project’s README for install, env setup, and Firebase Console steps.
-4. Build and break things — then harden them with the patterns in the next project.
-
-Never commit API keys meant for private use, service account files, or `.env` files with secrets. Prefer Firebase web config that is safe to expose client-side, and keep privileged credentials out of the repo.
-
----
-
-## Security mindset
-
-Firebase Auth identifies *who* a user is. Authorization decides *what* they can do.
-
-- Treat the client as untrusted.
-- Enforce access in **Security Rules** (and/or your backend), not only in the UI.
-- Prefer least privilege: grant only the access each role needs.
-- Validate tokens and claims on every sensitive operation.
-
-Each project calls out the security lesson it is meant to teach.
-
----
-
-## Contributing
-
-Issues and pull requests that improve clarity, fix bugs, or add well-scoped exercises are welcome. Keep new material aligned with the beginner → advanced path and include a short project README when adding a new folder.
-
----
-
-## License
-
-MIT — free to use for learning and teaching.
